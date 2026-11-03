@@ -1,15 +1,38 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
 import { shortenAddress } from "@/lib/utils";
-import { Wallet, ShieldCheck, ExternalLink, ArrowRightLeft } from "lucide-react";
+import { Wallet, ShieldCheck, ExternalLink, ArrowRightLeft, Fuel } from "lucide-react";
 import { contracts, chainConfig } from "@/config/contracts";
 
 export function Navbar() {
   const { address, isConnected, chain } = useAccount();
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
+  const [faucetLoading, setFaucetLoading] = useState(false);
+  const [faucetSuccess, setFaucetSuccess] = useState(false);
+
+  const requestEthFaucet = async () => {
+    if (!address) return;
+    setFaucetLoading(true);
+    try {
+      const res = await fetch(`${chainConfig.apiUrl}/api/borrowers/faucet/eth`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wallet_address: address, amount_eth: 1000 }),
+      });
+      if (res.ok) {
+        setFaucetSuccess(true);
+        setTimeout(() => setFaucetSuccess(false), 3000);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setFaucetLoading(false);
+    }
+  };
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -40,6 +63,15 @@ export function Navbar() {
           {/* Connect Wallet Button */}
           {isConnected && address ? (
             <div className="flex items-center gap-2">
+              <button
+                onClick={requestEthFaucet}
+                disabled={faucetLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600/20 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-600/30 transition-colors"
+                title="Credit 1,000 ETH to this address on local Anvil network"
+              >
+                <Fuel className="h-3.5 w-3.5" />
+                {faucetSuccess ? "Credited 1,000 ETH!" : faucetLoading ? "Funding..." : "Get 1,000 ETH"}
+              </button>
               <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-card text-xs font-mono">
                 <ShieldCheck className="h-4 w-4 text-primary" />
                 <span>{shortenAddress(address)}</span>

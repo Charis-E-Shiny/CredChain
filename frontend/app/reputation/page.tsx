@@ -7,11 +7,12 @@ import { formatTokenAmount } from "@/lib/utils";
 export default function ReputationPage() {
   const { address, isConnected, reputationScore, reputationRecord } = useCredChain();
 
-  const totalLoans = reputationRecord ? Number(reputationRecord[0]) : 0;
-  const repaidLoans = reputationRecord ? Number(reputationRecord[1]) : 0;
-  const defaultedLoans = reputationRecord ? Number(reputationRecord[2]) : 0;
-  const totalBorrowed = reputationRecord ? formatTokenAmount(reputationRecord[3]) : "0.00";
-  const totalRepaid = reputationRecord ? formatTokenAmount(reputationRecord[4]) : "0.00";
+  const rec = reputationRecord as any;
+  const totalLoans = rec ? Number(rec.totalLoans ?? rec[0] ?? 0) : 0;
+  const repaidLoans = rec ? Number(rec.repaidLoans ?? rec[1] ?? 0) : 0;
+  const defaultedLoans = rec ? Number(rec.defaultedLoans ?? rec[2] ?? 0) : 0;
+  const totalBorrowed = rec ? formatTokenAmount(rec.totalBorrowed ?? rec[3] ?? 0n) : "0.00";
+  const totalRepaid = rec ? formatTokenAmount(rec.totalRepaid ?? rec[4] ?? 0n) : "0.00";
 
   const completionRate = totalLoans > 0 ? ((repaidLoans / totalLoans) * 100).toFixed(1) : "100.0";
 

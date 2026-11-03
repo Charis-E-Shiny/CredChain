@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useCredChain } from "@/hooks/useCredChain";
 import { formatTokenAmount, shortenAddress } from "@/lib/utils";
 import {
@@ -11,8 +12,10 @@ import {
   ArrowUpRight,
   ShieldCheck,
   AlertCircle,
+  Fuel,
 } from "lucide-react";
 import Link from "next/link";
+import { chainConfig } from "@/config/contracts";
 
 export default function DashboardPage() {
   const {
@@ -28,6 +31,29 @@ export default function DashboardPage() {
     isWritePending,
   } = useCredChain();
 
+  const [ethLoading, setEthLoading] = useState(false);
+  const [ethSuccess, setEthSuccess] = useState(false);
+
+  const requestEthFaucet = async () => {
+    if (!address) return;
+    setEthLoading(true);
+    try {
+      const res = await fetch(`${chainConfig.apiUrl}/api/borrowers/faucet/eth`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wallet_address: address, amount_eth: 1000 }),
+      });
+      if (res.ok) {
+        setEthSuccess(true);
+        setTimeout(() => setEthSuccess(false), 3000);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setEthLoading(false);
+    }
+  };
+
   const formattedBalance = credBalance ? formatTokenAmount(credBalance) : "0.00";
   const ethPriceUSD = oraclePrice ? (Number(oraclePrice) / 1e8).toLocaleString("en-US", { style: "currency", currency: "USD" }) : "$2,500.00";
 
@@ -41,6 +67,14 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={requestEthFaucet}
+            disabled={!isConnected || ethLoading}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-emerald-600/20 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-600/30 disabled:opacity-50 transition-colors shadow-sm"
+          >
+            <Fuel className="h-4 w-4" />
+            {ethSuccess ? "Credited 1,000 ETH!" : ethLoading ? "Funding..." : "Get 1,000 Test ETH"}
+          </button>
           <button
             onClick={() => requestFaucet("1000")}
             disabled={!isConnected || isWritePending}

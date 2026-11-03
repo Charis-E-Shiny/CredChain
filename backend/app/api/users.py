@@ -4,12 +4,52 @@ API endpoints for borrower profiles.
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+import httpx
+from pydantic import BaseModel
 
 from app.database.connection import get_db
 from app.database.models import CreditAssessment, UserProfile
 from app.schemas.loan_schema import BorrowerProfile
 
 router = APIRouter(prefix="/borrowers", tags=["Borrowers"])
+
+
+class EthFaucetRequest(BaseModel):
+    wallet_address: str
+    amount_eth: float = 1000.0
+
+
+@router.post("/faucet/eth")
+async def fund_wallet_eth(request: EthFaucetRequest):
+    """Directly fund any wallet address with local Anvil test ETH."""
+    wallet = request.wallet_address.strip()
+    if not wallet.startswith("0x") or len(wallet) != 42:
+        raise HTTPException(status_code=400, detail="Invalid Ethereum address.")
+
+    # Calculate hex balance in wei (e.g. 1000 ETH = 1000 * 10^18 wei)
+    wei_amount = int(request.amount_eth * 1e18)
+    hex_wei = hex(wei_amount)
+
+    try:
+        async with httpx.AsyncClient() as client:
+            rpc_payload = {
+                "jsonrpc": "2.0",
+                "method": "anvil_setBalance",
+                "params": [wallet, hex_wei],
+                "id": 1,
+            }
+            res = await client.post("http://127.0.0.1:8545", json=rpc_payload, timeout=5.0)
+            data = res.json()
+            if "error" in data:
+                raise HTTPException(status_code=500, detail=f"RPC Error: {data['error']}")
+            return {
+                "status": "success",
+                "wallet_address": wallet,
+                "funded_eth": request.amount_eth,
+                "message": f"Successfully credited {request.amount_eth} ETH to {wallet}.",
+            }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to connect to Anvil RPC: {str(exc)}")
 
 
 @router.get("/{wallet}/profile", response_model=BorrowerProfile)

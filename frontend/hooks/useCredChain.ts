@@ -156,7 +156,9 @@ export function useCredChain() {
     borrowerLoanIds: (borrowerLoanIds || []) as bigint[],
     reputationScore: reputationScore ? Number(reputationScore) : 50,
     reputationRecord,
-    oraclePrice: oracleData ? (oracleData as [bigint, bigint])[0] : undefined,
+    oraclePrice: oracleData
+      ? (Array.isArray(oracleData) ? oracleData[0] : (oracleData as any)?.price)
+      : undefined,
     requestFaucet,
     approveToken,
     requestLoan,

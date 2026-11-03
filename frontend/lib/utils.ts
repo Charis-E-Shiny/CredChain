@@ -5,22 +5,55 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function shortenAddress(address: string, chars = 4): string {
+export function shortenAddress(address?: string | null, chars = 4): string {
+  if (!address) return "";
   return `${address.slice(0, chars + 2)}...${address.slice(-chars)}`;
 }
 
-export function formatTokenAmount(amount: bigint, decimals = 18, displayDecimals = 2): string {
-  const divisor = BigInt(10 ** decimals);
-  const whole = amount / divisor;
-  const fraction = amount % divisor;
-  const fractionStr = fraction.toString().padStart(decimals, "0").slice(0, displayDecimals);
-  return `${whole.toLocaleString()}.${fractionStr}`;
+/**
+ * Safely format any token amount (bigint, number, string, or undefined/null)
+ * without ever throwing a BigInt type mismatch.
+ */
+export function formatTokenAmount(
+  amount?: bigint | number | string | null,
+  decimals = 18,
+  displayDecimals = 2
+): string {
+  if (amount === undefined || amount === null || amount === "") return "0.00";
+
+  try {
+    let bigAmount: bigint;
+    if (typeof amount === "bigint") {
+      bigAmount = amount;
+    } else if (typeof amount === "number") {
+      bigAmount = BigInt(Math.floor(amount));
+    } else {
+      // String handling
+      const clean = amount.toString().trim();
+      if (!clean || clean === "0") return "0.00";
+      // If it contains a decimal point, take integer part
+      const intPart = clean.split(".")[0];
+      bigAmount = BigInt(intPart || "0");
+    }
+
+    const divisor = BigInt(10) ** BigInt(decimals);
+    const whole = bigAmount / divisor;
+    const fraction = bigAmount % divisor;
+    const fractionStr = fraction.toString().padStart(decimals, "0").slice(0, displayDecimals);
+    return `${whole.toLocaleString()}.${fractionStr}`;
+  } catch (err) {
+    return "0.00";
+  }
 }
 
-export function parseTokenAmount(amount: string, decimals = 18): bigint {
-  const [whole, fraction = ""] = amount.split(".");
-  const paddedFraction = fraction.padEnd(decimals, "0").slice(0, decimals);
-  return BigInt(whole + paddedFraction);
+export function parseTokenAmount(amount: string | number, decimals = 18): bigint {
+  try {
+    const [whole = "0", fraction = ""] = amount.toString().split(".");
+    const paddedFraction = fraction.padEnd(decimals, "0").slice(0, decimals);
+    return BigInt(whole + paddedFraction);
+  } catch {
+    return BigInt(0);
+  }
 }
 
 export function formatDate(timestamp: number): string {
@@ -54,7 +87,7 @@ export const loanStatusColors: Record<number, string> = {
 };
 
 export const riskCategoryColors: Record<string, string> = {
-  "LOW": "text-green-600 bg-green-50 dark:bg-green-900/20",
-  "MEDIUM": "text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20",
-  "HIGH": "text-red-600 bg-red-50 dark:bg-red-900/20",
+  LOW: "text-green-600 bg-green-50 dark:bg-green-900/20",
+  MEDIUM: "text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20",
+  HIGH: "text-red-600 bg-red-50 dark:bg-red-900/20",
 };
