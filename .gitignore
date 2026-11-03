@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# Build
+.next/
+out/
+dist/
+build/
+cache/
+
+# Foundry
+blockchain/out/
+blockchain/cache/
+broadcast/
+
+# Environment
+.env
+.env.local
+.env.production
+
+# ML artifacts
+backend/app/ml/artifacts/*.pkl
+backend/app/ml/artifacts/*.joblib
+
+# Database
+*.db
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Keys - NEVER commit
+*.pem
+*.key
+keystore/
