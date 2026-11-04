@@ -2,54 +2,93 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+  CredChain Color System
+  ----------------------
+  Primary     Deep forest   #183B32
+  Secondary   Muted sage    #315B4C
+  Accent      Warm brass    #D6A85F
+  Background  Warm ivory    #F4F1E8
+  Card        Pure white    #FFFFFF
+  Text        Charcoal      #252C29
+  Muted text  Stone grey    #777B73
+  Border      Warm grey     #E5E1D7
+  Success     Muted green   #34765A
+  Warning     Amber         #B77B26
+  Error       Muted red     #B94B45
+*/
+
 @layer base {
   :root {
-    --background: 0 0% 99%;
-    --foreground: 224 32% 12%;
+    /* Background: Warm ivory #F4F1E8 → hsl(43, 33%, 92%) */
+    --background: 43 33% 92%;
+    /* Foreground: Charcoal #252C29 → hsl(144, 7%, 16%) */
+    --foreground: 144 7% 16%;
+
+    /* Card: Pure white #FFFFFF */
     --card: 0 0% 100%;
-    --card-foreground: 224 32% 12%;
+    --card-foreground: 144 7% 16%;
+
     --popover: 0 0% 100%;
-    --popover-foreground: 224 32% 12%;
-    --primary: 243 75% 59%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 240 10% 96%;
-    --secondary-foreground: 224 32% 12%;
-    --muted: 240 10% 96%;
-    --muted-foreground: 220 14% 50%;
-    --accent: 243 75% 96%;
-    --accent-foreground: 243 75% 40%;
-    --destructive: 0 84% 60%;
+    --popover-foreground: 144 7% 16%;
+
+    /* Primary: Deep forest #183B32 → hsl(161, 42%, 16%) */
+    --primary: 161 42% 16%;
+    --primary-foreground: 43 33% 95%;
+
+    /* Secondary: Muted sage #315B4C → hsl(159, 30%, 28%) */
+    --secondary: 159 30% 28%;
+    --secondary-foreground: 43 33% 95%;
+
+    /* Muted: soft tint of background */
+    --muted: 43 20% 88%;
+    /* Muted foreground: Stone grey #777B73 → hsl(90, 3%, 47%) */
+    --muted-foreground: 90 3% 47%;
+
+    /* Accent: Warm brass #D6A85F → hsl(35, 60%, 60%) */
+    --accent: 35 60% 60%;
+    --accent-foreground: 144 7% 16%;
+
+    /* Destructive: Muted red #B94B45 → hsl(3, 44%, 50%) */
+    --destructive: 3 44% 50%;
     --destructive-foreground: 0 0% 100%;
-    --border: 220 16% 90%;
-    --input: 220 16% 90%;
-    --ring: 243 75% 59%;
+
+    /* Border: Warm grey #E5E1D7 → hsl(40, 22%, 87%) */
+    --border: 40 22% 87%;
+    --input: 40 22% 87%;
+    --ring: 161 42% 16%;
     --radius: 0.75rem;
-    --success: 142 71% 45%;
-    --warning: 38 92% 50%;
+
+    /* Semantic */
+    /* Success: Muted green #34765A → hsl(152, 38%, 34%) */
+    --success: 152 38% 34%;
+    /* Warning: Amber #B77B26 → hsl(35, 65%, 43%) */
+    --warning: 35 65% 43%;
   }
 
+  /* Keep dark class empty — this design is intentionally light/warm only */
   .dark {
-    --background: 232 32% 9%;
-    --foreground: 220 20% 94%;
-    --card: 232 28% 12%;
-    --card-foreground: 220 20% 94%;
-    --popover: 232 28% 12%;
-    --popover-foreground: 220 20% 94%;
-    --primary: 243 75% 65%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 232 24% 17%;
-    --secondary-foreground: 220 20% 94%;
-    --muted: 232 24% 17%;
-    --muted-foreground: 220 14% 55%;
-    --accent: 243 60% 20%;
-    --accent-foreground: 243 75% 75%;
-    --destructive: 0 72% 55%;
+    --background: 43 33% 92%;
+    --foreground: 144 7% 16%;
+    --card: 0 0% 100%;
+    --card-foreground: 144 7% 16%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 144 7% 16%;
+    --primary: 161 42% 16%;
+    --primary-foreground: 43 33% 95%;
+    --secondary: 159 30% 28%;
+    --secondary-foreground: 43 33% 95%;
+    --muted: 43 20% 88%;
+    --muted-foreground: 90 3% 47%;
+    --accent: 35 60% 60%;
+    --accent-foreground: 144 7% 16%;
+    --destructive: 3 44% 50%;
     --destructive-foreground: 0 0% 100%;
-    --border: 232 20% 20%;
-    --input: 232 20% 20%;
-    --ring: 243 75% 65%;
-    --success: 142 71% 45%;
-    --warning: 38 92% 50%;
+    --border: 40 22% 87%;
+    --input: 40 22% 87%;
+    --ring: 161 42% 16%;
+    --success: 152 38% 34%;
+    --warning: 35 65% 43%;
   }
 }
 
@@ -68,15 +107,32 @@
   width: 6px;
   height: 6px;
 }
-
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
-  @apply bg-muted-foreground/20 rounded-full;
+  background: #E5E1D7;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #c8c3b6;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  @apply bg-muted-foreground/40;
+/* Utility classes for the CredChain palette */
+@layer utilities {
+  .text-forest   { color: #183B32; }
+  .text-sage     { color: #315B4C; }
+  .text-brass    { color: #D6A85F; }
+  .text-charcoal { color: #252C29; }
+  .text-stone    { color: #777B73; }
+
+  .bg-forest     { background-color: #183B32; }
+  .bg-sage       { background-color: #315B4C; }
+  .bg-brass      { background-color: #D6A85F; }
+  .bg-ivory      { background-color: #F4F1E8; }
+  .bg-warm-grey  { background-color: #E5E1D7; }
+
+  .border-warm   { border-color: #E5E1D7; }
+  .border-brass  { border-color: #D6A85F; }
+  .border-forest { border-color: #183B32; }
 }

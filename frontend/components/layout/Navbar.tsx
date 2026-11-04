@@ -15,7 +15,6 @@ import {
   Lock,
   UserCheck,
   Briefcase,
-  ShieldAlert,
   Coins,
   AlertCircle,
   X,
@@ -126,35 +125,35 @@ export function Navbar() {
   const activeNav = role === "lender" ? lenderNav : role === "admin" ? adminNav : borrowerNav;
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+    <header className="sticky top-0 z-40 w-full border-b border-[#E5E1D7] bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 shadow-sm">
       {/* Admin Permission Warning Banner */}
       {adminError && (
-        <div className="bg-destructive/10 border-b border-destructive/20 px-4 py-2 text-xs text-destructive flex items-center justify-between">
+        <div className="bg-[#B94B45]/10 border-b border-[#B94B45]/20 px-4 py-2 text-xs text-[#B94B45] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <AlertCircle className="h-3.5 w-3.5 shrink-0" />
             <span>{adminError}</span>
           </div>
-          <button onClick={clearAdminError} className="hover:opacity-80 ml-4">
+          <button onClick={clearAdminError} className="hover:opacity-70 ml-4">
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
       )}
 
-      {/* Top Row: Brand + Right Controls */}
+      {/* Top Row */}
       <div className="flex h-14 items-center justify-between px-4 md:px-6">
         {/* Brand */}
         <div className="flex items-center gap-4">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-violet-600 to-indigo-500 flex items-center justify-center text-white font-black text-xs shadow-md shadow-indigo-500/30">
+            <div className="h-8 w-8 rounded-lg bg-[#183B32] flex items-center justify-center text-[#D6A85F] font-black text-xs shadow-sm">
               CC
             </div>
-            <span className="text-lg font-bold tracking-tight text-foreground">
+            <span className="text-lg font-bold tracking-tight text-[#183B32]">
               CredChain
             </span>
           </Link>
 
           {/* Role Switcher Pills */}
-          <div className="hidden md:flex items-center bg-muted/60 p-0.5 rounded-lg border gap-0.5">
+          <div className="hidden md:flex items-center bg-[#F4F1E8] p-0.5 rounded-lg border border-[#E5E1D7] gap-0.5">
             {[
               { key: "borrower" as const, label: "Borrower", icon: UserCheck },
               { key: "lender" as const, label: "Lender", icon: Briefcase },
@@ -167,8 +166,8 @@ export function Navbar() {
                 className={cn(
                   "flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition-all",
                   role === key
-                    ? "bg-background text-primary shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
+                    ? "bg-[#183B32] text-[#D6A85F] shadow-sm"
+                    : "text-[#777B73] hover:text-[#252C29]",
                   key === "admin" && !isAdmin && !isApprover && "opacity-60"
                 )}
               >
@@ -182,18 +181,18 @@ export function Navbar() {
         {/* Right Controls */}
         <div className="flex items-center gap-2">
           {/* Network Badge */}
-          <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg border bg-muted/40 font-mono">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-medium text-foreground">{networkName}</span>
+          <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg border border-[#E5E1D7] bg-[#F4F1E8] font-mono">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#34765A] animate-pulse" />
+            <span className="font-medium text-[#252C29]">{networkName}</span>
           </div>
 
           {isConnected && address ? (
             <div className="flex items-center gap-2">
               {/* CRED Balance */}
-              <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-lg border bg-muted/40 text-xs font-mono">
-                <Coins className="h-3 w-3 text-primary" />
-                <span className="font-bold">{formatTokenAmount(credBalance)}</span>
-                <span className="text-muted-foreground">CRED</span>
+              <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#E5E1D7] bg-[#F4F1E8] text-xs font-mono">
+                <Coins className="h-3 w-3 text-[#D6A85F]" />
+                <span className="font-bold text-[#252C29]">{formatTokenAmount(credBalance)}</span>
+                <span className="text-[#777B73]">CRED</span>
               </div>
 
               {/* Faucet */}
@@ -201,8 +200,8 @@ export function Navbar() {
                 <button
                   onClick={requestEthFaucet}
                   disabled={faucetLoading}
-                  className="hidden sm:flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/20 transition-colors"
-                  title="Credit 1,000 ETH to this address on Anvil"
+                  className="hidden sm:flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-[#34765A]/10 border border-[#34765A]/25 text-[#34765A] hover:bg-[#34765A]/20 transition-colors"
+                  title="Credit 1,000 ETH on Anvil"
                 >
                   <Fuel className="h-3 w-3" />
                   {faucetSuccess ? "Credited!" : faucetLoading ? "..." : "1,000 ETH"}
@@ -213,43 +212,43 @@ export function Navbar() {
               <div className="relative" ref={userMenuRef}>
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-mono rounded-lg border bg-background hover:bg-muted/40 transition-colors"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-mono rounded-lg border border-[#E5E1D7] bg-white hover:bg-[#F4F1E8] transition-colors"
                 >
-                  <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center">
-                    <User className="h-3 w-3 text-primary" />
+                  <div className="h-5 w-5 rounded-full bg-[#183B32]/10 flex items-center justify-center">
+                    <User className="h-3 w-3 text-[#183B32]" />
                   </div>
-                  <span className="font-semibold hidden sm:inline">{shortenAddress(address)}</span>
-                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                  <span className="font-semibold text-[#252C29] hidden sm:inline">{shortenAddress(address)}</span>
+                  <ChevronDown className="h-3 w-3 text-[#777B73]" />
                 </button>
 
                 {userMenuOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-52 rounded-xl border bg-background shadow-lg shadow-black/10 overflow-hidden z-50">
-                    <div className="p-3 border-b bg-muted/30">
-                      <p className="text-xs text-muted-foreground">Connected as</p>
-                      <p className="text-xs font-mono font-semibold text-foreground truncate">{address}</p>
+                  <div className="absolute right-0 top-full mt-2 w-52 rounded-xl border border-[#E5E1D7] bg-white shadow-lg shadow-[#252C29]/8 overflow-hidden z-50">
+                    <div className="p-3 border-b border-[#E5E1D7] bg-[#F4F1E8]">
+                      <p className="text-xs text-[#777B73]">Connected as</p>
+                      <p className="text-xs font-mono font-semibold text-[#252C29] truncate">{address}</p>
                     </div>
                     <div className="p-1">
                       <Link
                         href="/credit-passport"
                         onClick={() => setUserMenuOpen(false)}
-                        className="flex items-center gap-2 px-3 py-2 text-xs rounded-lg hover:bg-muted/60 text-foreground transition-colors"
+                        className="flex items-center gap-2 px-3 py-2 text-xs rounded-lg hover:bg-[#F4F1E8] text-[#252C29] transition-colors"
                       >
-                        <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+                        <ShieldCheck className="h-3.5 w-3.5 text-[#183B32]" />
                         My Credit Passport
                       </Link>
                       <Link
                         href="/reputation"
                         onClick={() => setUserMenuOpen(false)}
-                        className="flex items-center gap-2 px-3 py-2 text-xs rounded-lg hover:bg-muted/60 text-foreground transition-colors"
+                        className="flex items-center gap-2 px-3 py-2 text-xs rounded-lg hover:bg-[#F4F1E8] text-[#252C29] transition-colors"
                       >
-                        <Award className="h-3.5 w-3.5 text-primary" />
+                        <Award className="h-3.5 w-3.5 text-[#183B32]" />
                         My Reputation
                       </Link>
                     </div>
-                    <div className="p-1 border-t">
+                    <div className="p-1 border-t border-[#E5E1D7]">
                       <button
                         onClick={() => { disconnect(); setUserMenuOpen(false); router.push("/login"); }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-xs rounded-lg hover:bg-destructive/10 text-destructive transition-colors"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs rounded-lg hover:bg-[#B94B45]/10 text-[#B94B45] transition-colors"
                       >
                         <LogOut className="h-3.5 w-3.5" />
                         Sign Out
@@ -263,13 +262,13 @@ export function Navbar() {
             <div className="flex items-center gap-2">
               <Link
                 href="/login"
-                className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5"
+                className="text-xs font-semibold text-[#777B73] hover:text-[#252C29] transition-colors px-3 py-1.5"
               >
                 Sign In
               </Link>
               <Link
                 href="/login?tab=signup"
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-sm shadow-primary/25"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-[#183B32] text-[#D6A85F] hover:bg-[#1e4a3f] transition-all shadow-sm"
               >
                 <Wallet className="h-3.5 w-3.5" />
                 Get Started
@@ -279,7 +278,7 @@ export function Navbar() {
 
           {/* Mobile Hamburger */}
           <button
-            className="md:hidden p-2 rounded-lg hover:bg-muted/60 transition-colors"
+            className="md:hidden p-2 rounded-lg hover:bg-[#F4F1E8] transition-colors text-[#252C29]"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
             {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -287,9 +286,9 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* Nav Links Row — role-specific */}
+      {/* Nav Links Row — role-specific, only when connected */}
       {isConnected && (
-        <div className="hidden md:flex items-center px-6 h-10 border-t border-border/50 gap-1 overflow-x-auto">
+        <div className="hidden md:flex items-center px-6 h-9 border-t border-[#E5E1D7] bg-[#F4F1E8]/60 gap-1 overflow-x-auto">
           {activeNav.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
@@ -300,8 +299,8 @@ export function Navbar() {
                 className={cn(
                   "flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-all",
                   isActive
-                    ? "bg-primary/10 text-primary font-semibold"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    ? "bg-[#183B32] text-[#D6A85F] font-semibold"
+                    : "text-[#777B73] hover:text-[#252C29] hover:bg-[#E5E1D7]/70"
                 )}
               >
                 <Icon className="h-3.5 w-3.5 shrink-0" />
@@ -312,11 +311,11 @@ export function Navbar() {
         </div>
       )}
 
-      {/* Mobile Menu Dropdown */}
+      {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t bg-background/98 p-4 space-y-4">
+        <div className="md:hidden border-t border-[#E5E1D7] bg-white p-4 space-y-4">
           {/* Role Switcher */}
-          <div className="grid grid-cols-3 gap-1 p-1 bg-muted/50 rounded-lg">
+          <div className="grid grid-cols-3 gap-1 p-1 bg-[#F4F1E8] rounded-lg border border-[#E5E1D7]">
             {[
               { key: "borrower" as const, label: "Borrower" },
               { key: "lender" as const, label: "Lender" },
@@ -328,8 +327,8 @@ export function Navbar() {
                 className={cn(
                   "py-1.5 text-xs font-semibold rounded-md transition-all",
                   role === key
-                    ? "bg-background text-primary shadow-sm"
-                    : "text-muted-foreground"
+                    ? "bg-[#183B32] text-[#D6A85F] shadow-sm"
+                    : "text-[#777B73] hover:text-[#252C29]"
                 )}
               >
                 {label}
@@ -338,7 +337,7 @@ export function Navbar() {
           </div>
 
           {/* Nav links */}
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             {activeNav.map((item) => {
               const isActive = pathname === item.href;
               const Icon = item.icon;
@@ -350,8 +349,8 @@ export function Navbar() {
                   className={cn(
                     "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all",
                     isActive
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                      ? "bg-[#183B32] text-[#D6A85F]"
+                      : "text-[#777B73] hover:text-[#252C29] hover:bg-[#F4F1E8]"
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
@@ -361,31 +360,24 @@ export function Navbar() {
             })}
           </div>
 
-          {/* Mobile auth */}
           {!isConnected && (
-            <div className="pt-2 border-t space-y-2">
-              <Link
-                href="/login"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block w-full text-center py-2 text-sm font-semibold text-muted-foreground hover:text-foreground"
-              >
+            <div className="pt-2 border-t border-[#E5E1D7] space-y-2">
+              <Link href="/login" onClick={() => setMobileMenuOpen(false)}
+                className="block w-full text-center py-2 text-sm font-semibold text-[#777B73] hover:text-[#252C29]">
                 Sign In
               </Link>
-              <Link
-                href="/login?tab=signup"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block w-full text-center py-2 text-sm font-bold rounded-lg bg-primary text-primary-foreground"
-              >
+              <Link href="/login?tab=signup" onClick={() => setMobileMenuOpen(false)}
+                className="block w-full text-center py-2 text-sm font-bold rounded-lg bg-[#183B32] text-[#D6A85F]">
                 Get Started
               </Link>
             </div>
           )}
 
           {isConnected && address && (
-            <div className="pt-2 border-t">
+            <div className="pt-2 border-t border-[#E5E1D7]">
               <button
                 onClick={() => { disconnect(); router.push("/login"); setMobileMenuOpen(false); }}
-                className="w-full flex items-center justify-center gap-2 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                className="w-full flex items-center justify-center gap-2 py-2 text-sm font-medium text-[#B94B45] hover:bg-[#B94B45]/10 rounded-lg transition-colors"
               >
                 <LogOut className="h-4 w-4" />
                 Sign Out
