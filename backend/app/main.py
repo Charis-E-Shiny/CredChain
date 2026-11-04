@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.analytics import router as analytics_router
 from app.api.credit import router as credit_router
 from app.api.loans import router as loans_router
+from app.api.passport import router as passport_router
 from app.api.users import router as users_router
 from app.database.connection import Base, engine
 from app.services.prediction_service import is_model_loaded, load_model
@@ -64,6 +65,7 @@ app.include_router(credit_router, prefix="/api")
 app.include_router(loans_router, prefix="/api")
 app.include_router(users_router, prefix="/api")
 app.include_router(analytics_router, prefix="/api")
+app.include_router(passport_router, prefix="/api")
 
 
 @app.get("/api/health", tags=["Health"])

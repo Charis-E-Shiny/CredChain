@@ -22,3 +22,8 @@ httpx==0.28.1
 python-multipart==0.0.20
 slowapi==0.1.9
 aiosqlite==0.20.0
+reportlab>=4.0.0
+qrcode>=8.0
+pillow>=10.0.0
+web3>=6.0.0
+

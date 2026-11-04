@@ -54,3 +54,30 @@ class UserProfile(Base):
     wallet_address = Column(String, unique=True, index=True, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     total_assessments = Column(Integer, default=0)
+
+
+class CreditPassport(Base):
+    """Stores generated credit passports and on-chain verification snapshots."""
+
+    __tablename__ = "credit_passports"
+
+    id = Column(String, primary_key=True, default=_generate_uuid)
+    passport_id = Column(String, unique=True, index=True, nullable=False)  # bytes32 hex string
+    wallet_address = Column(String, index=True, nullable=False)
+    reputation_score = Column(Integer, default=50)
+    total_loans = Column(Integer, default=0)
+    repaid_loans = Column(Integer, default=0)
+    defaulted_loans = Column(Integer, default=0)
+    total_borrowed = Column(Float, default=0.0)
+    total_repaid = Column(Float, default=0.0)
+    risk_category = Column(String, default="LOW")  # LOW / MEDIUM / HIGH
+    confidence = Column(Float, default=0.0)
+    data_hash = Column(String, nullable=False)  # 0x-prefixed sha256 bytes32
+    issued_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    expires_at = Column(DateTime, nullable=False)
+    revoked = Column(Boolean, default=False)
+    revoked_at = Column(DateTime, nullable=True)
+    tx_hash = Column(String, nullable=True)
+    canonical_data_json = Column(Text, nullable=False)
+    pdf_path = Column(String, nullable=True)
+

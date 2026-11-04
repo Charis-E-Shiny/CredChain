@@ -12,11 +12,13 @@ import {
   Vote,
   Compass,
   SlidersHorizontal,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigationItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Credit Passport", href: "/credit-passport", icon: ShieldCheck },
   { name: "Credit Assessment", href: "/credit-assessment", icon: BrainCircuit },
   { name: "Apply for Loan", href: "/apply-loan", icon: FilePlus2 },
   { name: "Loan Marketplace", href: "/marketplace", icon: Store },
