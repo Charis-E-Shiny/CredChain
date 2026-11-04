@@ -21,3 +21,5 @@ sepolia = { key = "${ETHERSCAN_API_KEY}" }
 [rpc_endpoints]
 sepolia = "${SEPOLIA_RPC_URL}"
 localhost = "http://127.0.0.1:8545"
+ganache = "http://127.0.0.1:7545"
+ganache_cli = "http://127.0.0.1:8545"

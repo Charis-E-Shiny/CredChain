@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "ganache": "npx ganache --port 7545 --chain.chainId 1337"
   },
   "dependencies": {
     "next": "14.2.21",
