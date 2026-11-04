@@ -3,11 +3,10 @@ import { type Metadata } from "next";
 import { Web3Provider } from "@/config/web3";
 import { RoleProvider } from "@/context/RoleContext";
 import { Navbar } from "@/components/layout/Navbar";
-import { Sidebar } from "@/components/layout/Sidebar";
 
 export const metadata: Metadata = {
-  title: "CredChain — AI Decentralized Credit Scoring & Micro-Lending",
-  description: "AI-powered decentralized credit scoring and micro-lending protocol built on Ethereum Sepolia with Chainlink Oracles.",
+  title: "CredChain — Decentralized Credit & Lending",
+  description: "Transparent, AI-assisted credit scoring and micro-lending on the blockchain.",
 };
 
 export default function RootLayout({
@@ -22,12 +21,9 @@ export default function RootLayout({
           <RoleProvider>
             <div className="flex flex-col min-h-screen">
               <Navbar />
-              <div className="flex flex-1">
-                <Sidebar />
-                <main className="flex-1 p-6 overflow-y-auto">
-                  {children}
-                </main>
-              </div>
+              <main className="flex-1 p-4 md:p-6 max-w-screen-2xl mx-auto w-full">
+                {children}
+              </main>
             </div>
           </RoleProvider>
         </Web3Provider>
