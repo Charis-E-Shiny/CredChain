@@ -1,28 +1,86 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { parseEther, keccak256, toHex } from "viem";
 import { useCredChain } from "@/hooks/useCredChain";
-import { contracts } from "@/config/contracts";
-import { FilePlus2, CheckCircle2, AlertCircle, Coins, ShieldCheck } from "lucide-react";
+import { contracts, chainConfig } from "@/config/contracts";
+import { formatTokenAmount } from "@/lib/utils";
+import {
+  FilePlus2,
+  CheckCircle2,
+  AlertCircle,
+  Coins,
+  ShieldCheck,
+  BrainCircuit,
+  RotateCcw,
+  Info,
+  TrendingUp,
+} from "lucide-react";
+import Link from "next/link";
+
+interface PastAssessment {
+  id: string;
+  risk_score: number;
+  risk_category: string;
+  confidence: number;
+  created_at: string;
+}
 
 export default function ApplyLoanPage() {
-  const { isConnected, requestLoan, approveToken, isWritePending } = useCredChain();
+  const { address, isConnected, credBalance, oraclePrice, requestLoan, approveToken, isWritePending } = useCredChain();
 
   const [amount, setAmount] = useState("1000");
   const [collateral, setCollateral] = useState("200");
   const [durationDays, setDurationDays] = useState("30");
   const [interestRateBps, setInterestRateBps] = useState("500"); // 5%
-  const [riskAssessmentRef, setRiskAssessmentRef] = useState("AI-CREDIT-ASSESSMENT-V1");
+
+  const [recentAssessment, setRecentAssessment] = useState<PastAssessment | null>(null);
+  const [loadingAssessment, setLoadingAssessment] = useState(false);
 
   const [txHash, setTxHash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<"form" | "approving" | "requesting" | "done">("form");
 
+  // Fetch real assessment for connected wallet
+  useEffect(() => {
+    if (!address) return;
+    setLoadingAssessment(true);
+    fetch(`${chainConfig.apiUrl}/api/credit/history/${address}`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: PastAssessment[]) => {
+        if (data && data.length > 0) {
+          setRecentAssessment(data[0]);
+        } else {
+          setRecentAssessment(null);
+        }
+      })
+      .catch((e) => console.error("Error loading assessment:", e))
+      .finally(() => setLoadingAssessment(false));
+  }, [address]);
+
+  // Suggested collateral based on loan amount (20% minimum baseline or 150% LTV)
+  const suggestedCollateral = (parseFloat(amount || "0") * 0.2).toFixed(0);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isConnected) {
+    if (!isConnected || !address) {
       setError("Please connect your MetaMask wallet to apply for a loan.");
+      return;
+    }
+
+    const loanVal = parseFloat(amount);
+    const colVal = parseFloat(collateral);
+
+    if (loanVal <= 0 || colVal <= 0) {
+      setError("Loan and collateral amounts must be greater than zero.");
+      return;
+    }
+
+    const colWei = parseEther(collateral);
+    if (credBalance && credBalance < colWei) {
+      setError(
+        `Insufficient CRED balance for collateral. You need ${collateral} CRED, but have ${formatTokenAmount(credBalance)} CRED.`
+      );
       return;
     }
 
@@ -30,16 +88,18 @@ export default function ApplyLoanPage() {
 
     try {
       setStep("approving");
-      const colWei = parseEther(collateral);
       const loanWei = parseEther(amount);
       const durSecs = BigInt(parseInt(durationDays) * 86400);
       const rateBps = BigInt(interestRateBps);
-      const riskHash = keccak256(toHex(riskAssessmentRef));
 
-      // Approve escrow for collateral
+      // Use real assessment ID if available, otherwise deterministic wallet-salt hash
+      const assessmentRef = recentAssessment ? recentAssessment.id : `OFFCHAIN-CONSENTED-${address}`;
+      const riskHash = keccak256(toHex(assessmentRef));
+
+      // Step 1: Approve escrow for collateral tokens
       await approveToken(contracts.loanEscrow, colWei);
 
-      // Submit on-chain loan request
+      // Step 2: Submit on-chain loan request to LoanManager
       setStep("requesting");
       const hash = await requestLoan(loanWei, colWei, durSecs, rateBps, riskHash);
       setTxHash(hash);
@@ -50,128 +110,225 @@ export default function ApplyLoanPage() {
     }
   };
 
+  const ethPriceUSD = oraclePrice
+    ? (Number(oraclePrice) / 1e8).toLocaleString("en-US", { style: "currency", currency: "USD" })
+    : "$2,500.00";
+
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-6 pb-12">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <FilePlus2 className="h-6 w-6 text-primary" />
-          Apply for Micro-Loan
-        </h1>
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-2">
+          <FilePlus2 className="h-3.5 w-3.5" />
+          Loan Origination
+        </div>
+        <h1 className="text-3xl font-extrabold tracking-tight">Apply for Micro-Loan</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Lock collateral test tokens into non-custodial escrow and submit a loan request on Ethereum.
+          Lock collateral tokens in escrow and submit your loan request to the on-chain governance queue.
         </p>
       </div>
 
-      <div className="p-6 rounded-xl border bg-card space-y-5">
-        {step === "done" ? (
-          <div className="text-center py-8 space-y-4">
-            <CheckCircle2 className="h-12 w-12 mx-auto text-emerald-400" />
-            <h2 className="text-lg font-bold">Loan Request Submitted On-Chain!</h2>
-            <p className="text-xs text-muted-foreground max-w-md mx-auto">
-              Your application is now in <span className="font-semibold text-yellow-400">REQUESTED</span> state.
-              Authorized approvers in the governance module will verify your ML risk assessment and approve disbursement.
+      {/* AI Assessment Status Card */}
+      <div className="p-4 rounded-2xl border bg-card/60 backdrop-blur shadow-sm space-y-2">
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+            <BrainCircuit className="h-4 w-4 text-sky-400" />
+            Consented AI Risk Assessment
+          </span>
+          {recentAssessment ? (
+            <span className="px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-mono text-[11px] font-bold">
+              VERIFIED: {recentAssessment.risk_category} RISK
+            </span>
+          ) : (
+            <span className="px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[11px] font-semibold">
+              UNASSESSED
+            </span>
+          )}
+        </div>
+
+        {recentAssessment ? (
+          <div className="text-xs text-muted-foreground space-y-1">
+            <p>
+              Referencing Assessment ID: <span className="font-mono text-foreground font-semibold">{recentAssessment.id.slice(0, 18)}...</span>
             </p>
-            {txHash && (
-              <div className="p-3 rounded-lg border bg-muted/30 font-mono text-xs break-all">
-                Tx: {txHash}
-              </div>
-            )}
+            <p className="text-[11px] text-muted-foreground">
+              Risk Score: {recentAssessment.risk_score.toFixed(3)} | Confidence: {(recentAssessment.confidence * 100).toFixed(1)}% | Completed: {new Date(recentAssessment.created_at).toLocaleDateString()}
+            </p>
+          </div>
+        ) : (
+          <div className="text-xs text-muted-foreground flex items-center justify-between gap-2 pt-1">
+            <span>No prior AI assessment found for this wallet. Standard baseline scoring will apply.</span>
+            <Link href="/credit-assessment" className="text-primary font-semibold hover:underline shrink-0">
+              Run Assessment &rarr;
+            </Link>
+          </div>
+        )}
+      </div>
+
+      {/* Oracle Collateral Reference */}
+      <div className="p-4 rounded-xl border bg-muted/20 text-xs flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <TrendingUp className="h-4 w-4 text-emerald-400" />
+          <span className="text-muted-foreground">Chainlink Oracle Benchmark:</span>
+          <span className="font-mono font-bold text-foreground">ETH/USD {ethPriceUSD}</span>
+        </div>
+        <span className="text-[11px] text-muted-foreground">Collateral Escrow: 100% On-Chain</span>
+      </div>
+
+      {step === "done" ? (
+        <div className="p-8 rounded-2xl border bg-card/60 backdrop-blur shadow-sm text-center space-y-4">
+          <div className="h-14 w-14 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-500 mx-auto">
+            <CheckCircle2 className="h-8 w-8" />
+          </div>
+          <h2 className="text-xl font-bold">Loan Application Submitted!</h2>
+          <p className="text-xs text-muted-foreground max-w-sm mx-auto leading-relaxed">
+            Your collateral of {collateral} CRED has been deposited into <span className="font-mono text-foreground">LoanEscrow.sol</span>. Your loan request is now in the governance approval queue.
+          </p>
+          <div className="p-3 rounded-xl bg-muted/30 font-mono text-xs break-all text-muted-foreground">
+            Transaction: {txHash}
+          </div>
+          <div className="flex items-center justify-center gap-3 pt-2">
+            <Link
+              href="/borrower"
+              className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:opacity-90"
+            >
+              Borrower Dashboard
+            </Link>
             <button
               onClick={() => {
                 setStep("form");
                 setTxHash(null);
               }}
-              className="px-4 py-2 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
+              className="px-4 py-2 rounded-xl border text-xs font-semibold hover:bg-muted"
             >
-              Submit Another Application
+              Apply for Another
             </button>
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-            {error && (
-              <div className="p-3 rounded-lg bg-red-950/20 border border-red-800 text-red-400 flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            <div className="space-y-1">
-              <label className="text-muted-foreground font-medium">Loan Principal (CRED Tokens)</label>
-              <input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border bg-background font-mono text-sm"
-                required
-              />
-              <p className="text-[11px] text-muted-foreground">Standard micro-lending max: 5,000 CRED without multi-sig review.</p>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="p-6 rounded-2xl border bg-card/60 backdrop-blur shadow-sm space-y-5">
+          {error && (
+            <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-xs flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{error}</span>
             </div>
+          )}
 
-            <div className="space-y-1">
-              <label className="text-muted-foreground font-medium">Collateral Deposit (CRED Tokens)</label>
+          {/* Amount */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Loan Principal (CRED)
+            </label>
+            <input
+              type="number"
+              step="any"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="w-full bg-muted/30 border rounded-xl px-3.5 py-2.5 text-xs font-mono font-semibold focus:outline-none focus:ring-1 focus:ring-primary"
+              required
+            />
+          </div>
+
+          {/* Collateral */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs">
+              <label className="font-bold uppercase tracking-wider text-muted-foreground">
+                Collateral Deposit (CRED)
+              </label>
+              <span className="text-muted-foreground text-[11px]">
+                Available: <span className="font-mono text-foreground">{formatTokenAmount(credBalance)} CRED</span>
+              </span>
+            </div>
+            <div className="relative">
               <input
                 type="number"
+                step="any"
                 value={collateral}
                 onChange={(e) => setCollateral(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border bg-background font-mono text-sm"
+                className="w-full bg-muted/30 border rounded-xl px-3.5 py-2.5 text-xs font-mono font-semibold focus:outline-none focus:ring-1 focus:ring-primary"
                 required
               />
-              <p className="text-[11px] text-muted-foreground">Held securely in LoanEscrow.sol. Returned upon complete repayment.</p>
+              <button
+                type="button"
+                onClick={() => setCollateral(suggestedCollateral)}
+                className="absolute right-2.5 top-2 px-2 py-0.5 rounded text-[11px] font-bold bg-primary/20 text-primary hover:bg-primary/30 transition-colors"
+              >
+                Suggested ({suggestedCollateral})
+              </button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Locked in <span className="font-mono text-foreground">LoanEscrow.sol</span> and released upon full loan repayment.
+            </p>
+          </div>
+
+          {/* Duration & Interest */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Tenor / Duration
+              </label>
+              <select
+                value={durationDays}
+                onChange={(e) => setDurationDays(e.target.value)}
+                className="w-full bg-muted/30 border rounded-xl px-3.5 py-2.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="7">7 Days (Short-term)</option>
+                <option value="14">14 Days</option>
+                <option value="30">30 Days (Standard)</option>
+                <option value="60">60 Days</option>
+                <option value="90">90 Days</option>
+              </select>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-muted-foreground font-medium">Repayment Duration (Days)</label>
-                <input
-                  type="number"
-                  value={durationDays}
-                  onChange={(e) => setDurationDays(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border bg-background font-mono text-sm"
-                  min="1"
-                  max="365"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-muted-foreground font-medium">Interest Rate (Basis Points)</label>
-                <input
-                  type="number"
-                  value={interestRateBps}
-                  onChange={(e) => setInterestRateBps(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border bg-background font-mono text-sm"
-                  placeholder="500 = 5.0%"
-                  required
-                />
-              </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Offered Interest (APR)
+              </label>
+              <select
+                value={interestRateBps}
+                onChange={(e) => setInterestRateBps(e.target.value)}
+                className="w-full bg-muted/30 border rounded-xl px-3.5 py-2.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="300">3.0% APR</option>
+                <option value="500">5.0% APR (Competitive)</option>
+                <option value="800">8.0% APR</option>
+                <option value="1000">10.0% APR</option>
+              </select>
             </div>
+          </div>
 
-            <div className="space-y-1">
-              <label className="text-muted-foreground font-medium">AI Risk Assessment Identifier</label>
-              <input
-                type="text"
-                value={riskAssessmentRef}
-                onChange={(e) => setRiskAssessmentRef(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border bg-background font-mono"
-                required
-              />
-              <p className="text-[11px] text-muted-foreground">Keccak256 hash stored on-chain for auditability.</p>
-            </div>
+          {/* Synthetic Data Disclaimer */}
+          <div className="p-3.5 rounded-xl border bg-muted/20 text-[11px] text-muted-foreground leading-relaxed flex items-start gap-2">
+            <Info className="h-4 w-4 shrink-0 mt-0.5 text-sky-400" />
+            <span>
+              <b>Academic FinTech Prototype Notice:</b> Loan approvals and risk assessments are evaluated by off-chain models trained on synthetic credit datasets. Do not use real financial capital.
+            </span>
+          </div>
 
-            <button
-              type="submit"
-              disabled={isWritePending || !isConnected}
-              className="w-full py-3 rounded-lg bg-primary text-primary-foreground font-semibold text-xs hover:bg-primary/90 disabled:opacity-50 transition-colors shadow-sm"
-            >
-              {isWritePending
-                ? "Submitting to Blockchain..."
-                : isConnected
-                ? "Lock Collateral & Submit Loan Request"
-                : "Connect Wallet to Apply"}
-            </button>
-          </form>
-        )}
-      </div>
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={isWritePending || step !== "form"}
+            className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-bold text-xs hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50 shadow-md shadow-primary/20"
+          >
+            {step === "approving" ? (
+              <>
+                <RotateCcw className="h-4 w-4 animate-spin" />
+                Step 1/2: Approving Collateral Escrow...
+              </>
+            ) : step === "requesting" ? (
+              <>
+                <RotateCcw className="h-4 w-4 animate-spin" />
+                Step 2/2: Registering Loan on Blockchain...
+              </>
+            ) : (
+              <>
+                <FilePlus2 className="h-4 w-4" />
+                Authorize & Submit Loan Request
+              </>
+            )}
+          </button>
+        </form>
+      )}
     </div>
   );
 }

@@ -1,95 +1,239 @@
 "use client";
 
+import Link from "next/link";
+import { AdminGate } from "@/components/auth/AdminGate";
 import { useCredChain } from "@/hooks/useCredChain";
-import { SlidersHorizontal, ShieldCheck, PauseCircle, PlayCircle, Activity, AlertTriangle } from "lucide-react";
-import { useState } from "react";
+import { formatTokenAmount, shortenAddress } from "@/lib/utils";
+import {
+  SlidersHorizontal,
+  FileCheck2,
+  Vote,
+  TrendingUp,
+  Users,
+  Compass,
+  Activity,
+  AlertTriangle,
+  ShieldCheck,
+  Coins,
+  Receipt,
+  Layers,
+  ArrowUpRight,
+} from "lucide-react";
 
 export default function AdminDashboardPage() {
-  const { isConnected, totalLoans, activeLoans } = useCredChain();
-  const [paused, setPaused] = useState(false);
-  const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const {
+    allLoans,
+    pendingApprovalLoans,
+    activeLoans,
+    totalLoans,
+    oraclePrice,
+  } = useCredChain();
+
+  const totalVolumeWei = allLoans.reduce((acc, l) => acc + l.principal, BigInt(0));
+  const defaultedCount = allLoans.filter((l) => l.status === 4).length;
+  const activeCount = Number(activeLoans ?? 0);
+  const pendingCount = pendingApprovalLoans.length;
+
+  const ethPriceUSD = oraclePrice
+    ? (Number(oraclePrice) / 1e8).toLocaleString("en-US", { style: "currency", currency: "USD" })
+    : "$2,500.00";
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <SlidersHorizontal className="h-6 w-6 text-primary" />
-          Administrative & Protocol Health Console
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Restricted control panel for emergency circuit breakers, oracle health monitoring, and system metrics.
-        </p>
-      </div>
-
-      {statusMsg && (
-        <div className="p-3 rounded-lg border bg-muted/40 font-mono text-xs">
-          {statusMsg}
-        </div>
-      )}
-
-      {/* Protocol Telemetry */}
-      <div className="grid sm:grid-cols-3 gap-4">
-        <div className="p-5 rounded-xl border bg-card space-y-2">
-          <div className="text-xs text-muted-foreground font-medium">Circuit Breaker Status</div>
-          <div className="flex items-center gap-2">
-            <span className={`h-3 w-3 rounded-full ${paused ? "bg-red-500" : "bg-emerald-500 animate-pulse"}`}></span>
-            <span className="font-bold text-lg">{paused ? "PAUSED" : "OPERATIONAL"}</span>
+    <AdminGate>
+      <div className="max-w-6xl mx-auto space-y-8 pb-12">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-6">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-2">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Administrative Governance Console
+            </div>
+            <h1 className="text-3xl font-extrabold tracking-tight">Protocol Administration</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              On-chain governance monitoring, loan approval workflows, risk parameters, and emergency circuit breakers.
+            </p>
           </div>
-          <div className="text-xs text-muted-foreground">Emergency stop controls</div>
-        </div>
 
-        <div className="p-5 rounded-xl border bg-card space-y-2">
-          <div className="text-xs text-muted-foreground font-medium">Total Micro-Loans</div>
-          <div className="text-2xl font-bold font-mono">{totalLoans ? totalLoans.toString() : "0"}</div>
-          <div className="text-xs text-muted-foreground">{activeLoans ? activeLoans.toString() : "0"} currently active</div>
-        </div>
-
-        <div className="p-5 rounded-xl border bg-card space-y-2">
-          <div className="text-xs text-muted-foreground font-medium">Chainlink Oracle Health</div>
-          <div className="flex items-center gap-2 text-emerald-400 font-bold">
-            <Activity className="h-4 w-4" />
-            <span>ONLINE</span>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/admin/approvals"
+              className="px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-bold flex items-center gap-2 shadow-sm hover:opacity-90 transition-opacity"
+            >
+              <FileCheck2 className="h-4 w-4" />
+              Approval Queue ({pendingCount})
+            </Link>
+            <Link
+              href="/governance"
+              className="px-4 py-2.5 rounded-xl border bg-card hover:bg-muted text-xs font-semibold flex items-center gap-2 transition-colors"
+            >
+              <Vote className="h-4 w-4" />
+              Governance Settings
+            </Link>
           </div>
-          <div className="text-xs text-muted-foreground">Staleness window: 3600s</div>
+        </div>
+
+        {/* Telemetry Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="p-5 rounded-2xl border bg-card/60 backdrop-blur shadow-sm space-y-2">
+            <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Total Loan Volume</div>
+            <div className="text-2xl font-black font-mono">
+              {formatTokenAmount(totalVolumeWei)} <span className="text-xs font-sans text-muted-foreground">CRED</span>
+            </div>
+            <div className="text-[11px] text-muted-foreground">Cumulative principal across {totalLoans ? totalLoans.toString() : "0"} loans</div>
+          </div>
+
+          <div className="p-5 rounded-2xl border bg-card/60 backdrop-blur shadow-sm space-y-2">
+            <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Pending Approvals</div>
+            <div className="text-2xl font-black font-mono text-amber-400">{pendingCount}</div>
+            <div className="text-[11px] text-muted-foreground">Awaiting multi-approver or governance review</div>
+          </div>
+
+          <div className="p-5 rounded-2xl border bg-card/60 backdrop-blur shadow-sm space-y-2">
+            <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Active Loans</div>
+            <div className="text-2xl font-black font-mono text-primary">{activeCount}</div>
+            <div className="text-[11px] text-muted-foreground">Currently funded & in debt service</div>
+          </div>
+
+          <div className="p-5 rounded-2xl border bg-card/60 backdrop-blur shadow-sm space-y-2">
+            <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Defaulted Loans</div>
+            <div className="text-2xl font-black font-mono text-destructive">{defaultedCount}</div>
+            <div className="text-[11px] text-muted-foreground">Collateral seized upon breach</div>
+          </div>
+        </div>
+
+        {/* Health & Protocol Status Bar */}
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div className="p-5 rounded-2xl border bg-card/60 backdrop-blur shadow-sm space-y-2">
+            <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              <span>Chainlink Oracle Status</span>
+              <Activity className="h-4 w-4 text-emerald-400" />
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-black font-mono">{ethPriceUSD}</span>
+              <span className="text-xs text-emerald-400 font-semibold font-mono">ONLINE</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Feed staleness threshold: 3,600s. Price deviation circuits operational.
+            </p>
+          </div>
+
+          <div className="p-5 rounded-2xl border bg-card/60 backdrop-blur shadow-sm space-y-2">
+            <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              <span>Protocol Circuit Breakers</span>
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            </div>
+            <div className="text-2xl font-black text-emerald-400">OPERATIONAL</div>
+            <p className="text-xs text-muted-foreground">
+              All core contracts unpaused. Lending and escrow settlements functioning normally.
+            </p>
+          </div>
+        </div>
+
+        {/* Admin Navigation Hub */}
+        <div className="space-y-4">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+            Administrative Modules
+          </h2>
+
+          <div className="grid sm:grid-cols-3 gap-4">
+            <Link
+              href="/admin/approvals"
+              className="p-5 rounded-2xl border bg-card/50 hover:bg-muted/40 transition-colors group flex items-start justify-between"
+            >
+              <div className="space-y-1">
+                <div className="font-bold text-sm group-hover:text-primary transition-colors flex items-center gap-2">
+                  <FileCheck2 className="h-4 w-4 text-primary" />
+                  Loan Approval Queue
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Review borrower applications and submit on-chain approvals or rejections.
+                </p>
+              </div>
+              <ArrowUpRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+            </Link>
+
+            <Link
+              href="/governance"
+              className="p-5 rounded-2xl border bg-card/50 hover:bg-muted/40 transition-colors group flex items-start justify-between"
+            >
+              <div className="space-y-1">
+                <div className="font-bold text-sm group-hover:text-primary transition-colors flex items-center gap-2">
+                  <Vote className="h-4 w-4 text-sky-400" />
+                  Governance Thresholds
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Configure multi-approval thresholds and high-value loan ceilings.
+                </p>
+              </div>
+              <ArrowUpRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+            </Link>
+
+            <Link
+              href="/admin/oracle"
+              className="p-5 rounded-2xl border bg-card/50 hover:bg-muted/40 transition-colors group flex items-start justify-between"
+            >
+              <div className="space-y-1">
+                <div className="font-bold text-sm group-hover:text-primary transition-colors flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-emerald-400" />
+                  Risk & Oracle Telemetry
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Inspect Chainlink price feeds, LTV health ratios, and liquidation buffers.
+                </p>
+              </div>
+              <ArrowUpRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+            </Link>
+
+            <Link
+              href="/admin/roles"
+              className="p-5 rounded-2xl border bg-card/50 hover:bg-muted/40 transition-colors group flex items-start justify-between"
+            >
+              <div className="space-y-1">
+                <div className="font-bold text-sm group-hover:text-primary transition-colors flex items-center gap-2">
+                  <Users className="h-4 w-4 text-amber-400" />
+                  Role Management
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Grant or revoke APPROVER_ROLE, OPERATOR_ROLE, and ISSUER_ROLE assignments.
+                </p>
+              </div>
+              <ArrowUpRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+            </Link>
+
+            <Link
+              href="/admin/controls"
+              className="p-5 rounded-2xl border bg-card/50 hover:bg-muted/40 transition-colors group flex items-start justify-between"
+            >
+              <div className="space-y-1">
+                <div className="font-bold text-sm group-hover:text-primary transition-colors flex items-center gap-2">
+                  <SlidersHorizontal className="h-4 w-4 text-destructive" />
+                  Emergency Controls
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Execute pause / unpause circuit breakers for protocol smart contracts.
+                </p>
+              </div>
+              <ArrowUpRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+            </Link>
+
+            <Link
+              href="/explorer"
+              className="p-5 rounded-2xl border bg-card/50 hover:bg-muted/40 transition-colors group flex items-start justify-between"
+            >
+              <div className="space-y-1">
+                <div className="font-bold text-sm group-hover:text-primary transition-colors flex items-center gap-2">
+                  <Compass className="h-4 w-4 text-cyan-400" />
+                  Contract Explorer
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Inspect raw smart contract ABIs, deployed addresses, and on-chain state.
+                </p>
+              </div>
+              <ArrowUpRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+            </Link>
+          </div>
         </div>
       </div>
-
-      {/* Emergency Controls */}
-      <div className="p-6 rounded-xl border bg-card space-y-4">
-        <h2 className="text-base font-semibold flex items-center gap-2 text-yellow-500">
-          <AlertTriangle className="h-5 w-5" />
-          Emergency Protocol Controls (PAUSER_ROLE)
-        </h2>
-        <p className="text-xs text-muted-foreground leading-relaxed">
-          OpenZeppelin Pausable implementation allows authorized operators to halt new loan requests, disbursements, and token transfers in case of anomalous market volatility or contract inspection.
-        </p>
-
-        <div className="flex gap-4 pt-2">
-          <button
-            onClick={() => {
-              setPaused(true);
-              setStatusMsg("Simulated protocol pause triggered. State: PAUSED.");
-            }}
-            disabled={paused}
-            className="px-4 py-2 text-xs font-semibold rounded-lg bg-red-600 text-white hover:bg-red-500 disabled:opacity-50 transition-colors flex items-center gap-1.5"
-          >
-            <PauseCircle className="h-4 w-4" />
-            Pause Protocol
-          </button>
-
-          <button
-            onClick={() => {
-              setPaused(false);
-              setStatusMsg("Protocol unpaused. State: OPERATIONAL.");
-            }}
-            disabled={!paused}
-            className="px-4 py-2 text-xs font-semibold rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50 transition-colors flex items-center gap-1.5"
-          >
-            <PlayCircle className="h-4 w-4" />
-            Unpause Protocol
-          </button>
-        </div>
-      </div>
-    </div>
+    </AdminGate>
   );
 }

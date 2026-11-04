@@ -1,10 +1,19 @@
 "use client";
 
 import { WagmiProvider, createConfig, http } from "wagmi";
-import { sepolia, hardhat } from "wagmi/chains";
+import { sepolia } from "wagmi/chains";
 import { defineChain } from "viem";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
+
+export const anvil = defineChain({
+  id: 31337,
+  name: "Anvil Local",
+  nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+  rpcUrls: {
+    default: { http: ["http://127.0.0.1:8545"] },
+  },
+});
 
 export const ganache = defineChain({
   id: 1337,
@@ -25,10 +34,10 @@ export const ganacheGui = defineChain({
 });
 
 const config = createConfig({
-  chains: [sepolia, hardhat, ganache, ganacheGui],
+  chains: [anvil, sepolia, ganache, ganacheGui],
   transports: {
+    [anvil.id]: http("http://127.0.0.1:8545"),
     [sepolia.id]: http(),
-    [hardhat.id]: http("http://127.0.0.1:8545"),
     [ganache.id]: http("http://127.0.0.1:7545"),
     [ganacheGui.id]: http("http://127.0.0.1:7545"),
   },
