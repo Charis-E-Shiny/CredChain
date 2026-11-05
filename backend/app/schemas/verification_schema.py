@@ -32,7 +32,12 @@ class DocumentItem(BaseModel):
     document_type: str
     upload_timestamp: str
     status: str
-    extracted_income: Optional[float] = None
+    extracted_income: Optional[float] = None  # Primary Gross Monthly Income
+    extracted_gross_income: Optional[float] = None
+    extracted_net_income: Optional[float] = None
+    basic_salary: Optional[float] = None
+    allowances: Optional[float] = None
+    total_deductions: Optional[float] = None
     extraction_confidence: Optional[float] = None
 
     model_config = {"from_attributes": True}
@@ -45,6 +50,8 @@ class DocumentUploadResponse(BaseModel):
     file_size_bytes: int
     document_type: str
     status: str
+    extracted_gross_income: Optional[float] = None
+    extracted_net_income: Optional[float] = None
     message: str
 
 
@@ -53,14 +60,24 @@ class ProcessVerificationRequest(BaseModel):
     declared_annual_income: float = Field(..., gt=0)
     declared_monthly_debt: float = Field(default=0.0, ge=0)
     declared_employment_years: float = Field(default=0.0, ge=0)
-    tolerance_percentage: float = Field(default=5.0, ge=1.0, le=25.0, description="Tolerance percentage for variance (default 5%)")
+    tolerance_percentage: float = Field(
+        default=5.0,
+        ge=1.0,
+        le=25.0,
+        description="Tolerance percentage for variance (default 5%)",
+    )
 
 
 class DiscrepancyReport(BaseModel):
     declared_annual_income: float
-    declared_monthly_income: float
-    extracted_monthly_income: float
-    discrepancy_percentage: float
+    declared_monthly_income: float  # Declared Gross Monthly
+    extracted_monthly_income: float  # Extracted Gross Monthly
+    extracted_gross_monthly_income: float = 0.0
+    extracted_net_monthly_income: Optional[float] = None
+    basic_salary: Optional[float] = None
+    allowances: Optional[float] = None
+    total_deductions: Optional[float] = None
+    discrepancy_percentage: float  # Reconciliation Variance %
     tolerance_percentage: float
     is_within_tolerance: bool
     status: VerificationStatusEnum
@@ -78,6 +95,11 @@ class VerificationStatusResponse(BaseModel):
     declared_monthly_debt: float
     declared_employment_years: float
     extracted_monthly_income: float
+    extracted_gross_monthly_income: float = 0.0
+    extracted_net_monthly_income: Optional[float] = None
+    basic_salary: Optional[float] = None
+    allowances: Optional[float] = None
+    total_deductions: Optional[float] = None
     discrepancy_percentage: float
     tolerance_percentage: float = 5.0
     record_hash: Optional[str] = None
@@ -108,7 +130,7 @@ class AdminReviewRequest(BaseModel):
     target_status: VerificationStatusEnum
     notes: Optional[str] = ""
     verifier_address: Optional[str] = None
-    source_verifier_name: Optional[str] = None  # e.g. "Equifax Integration", "Authorized Bank Feed", "Admin Attestation"
+    source_verifier_name: Optional[str] = None
 
 
 class AdminReviewItem(BaseModel):
@@ -117,6 +139,8 @@ class AdminReviewItem(BaseModel):
     declared_annual_income: float
     declared_monthly_income: float
     extracted_monthly_income: float
+    extracted_gross_monthly_income: Optional[float] = 0.0
+    extracted_net_monthly_income: Optional[float] = None
     discrepancy_percentage: float
     requires_manual_review: bool
     documents_count: int

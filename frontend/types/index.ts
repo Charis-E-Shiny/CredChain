@@ -41,6 +41,10 @@ export interface CreditAssessmentRequest {
 
 export interface CreditAssessmentResponse {
   risk_score: number;
+  predicted_default_probability?: number;
+  raw_risk_score?: number | null;
+  verification_adjustment?: number | null;
+  verification_score_adjustment?: number | null;
   risk_category: "LOW" | "MEDIUM" | "HIGH";
   confidence: number;
   contributing_factors: FeatureImportance[];
@@ -49,6 +53,16 @@ export interface CreditAssessmentResponse {
   assessment_id: string;
   timestamp: string;
   disclaimer: string;
+  verification_status?: VerificationStatusType | string;
+  declared_income?: number;
+  declared_gross_monthly_income?: number;
+  extracted_income?: number | null;
+  extracted_gross_monthly_income?: number | null;
+  extracted_net_monthly_income?: number | null;
+  income_discrepancy_percentage?: number | null;
+  reconciliation_variance?: number | null;
+  verification_notes?: string | null;
+  requires_manual_review?: boolean;
 }
 
 export interface FeatureImportance {
@@ -83,6 +97,11 @@ export interface VerificationDocumentItem {
   upload_timestamp: string;
   status: string;
   extracted_income: number | null;
+  extracted_gross_income?: number | null;
+  extracted_net_income?: number | null;
+  basic_salary?: number | null;
+  allowances?: number | null;
+  total_deductions?: number | null;
   extraction_confidence: number | null;
 }
 
@@ -94,6 +113,11 @@ export interface VerificationStatusResponse {
   declared_monthly_debt: number;
   declared_employment_years: number;
   extracted_monthly_income: number;
+  extracted_gross_monthly_income?: number;
+  extracted_net_monthly_income?: number | null;
+  basic_salary?: number | null;
+  allowances?: number | null;
+  total_deductions?: number | null;
   discrepancy_percentage: number;
   tolerance_percentage: number;
   record_hash: string | null;
@@ -111,6 +135,11 @@ export interface DiscrepancyReport {
   declared_annual_income: number;
   declared_monthly_income: number;
   extracted_monthly_income: number;
+  extracted_gross_monthly_income?: number;
+  extracted_net_monthly_income?: number | null;
+  basic_salary?: number | null;
+  allowances?: number | null;
+  total_deductions?: number | null;
   discrepancy_percentage: number;
   tolerance_percentage: number;
   is_within_tolerance: boolean;

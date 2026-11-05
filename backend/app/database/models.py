@@ -96,7 +96,12 @@ class VerificationDocument(Base):
     document_type = Column(String, default="salary_slip")  # salary_slip, bank_statement, employment_letter, tax_return, other
     upload_timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     extracted_text = Column(Text, nullable=True)
-    extracted_income = Column(Float, nullable=True)
+    extracted_income = Column(Float, nullable=True)  # Primary Gross Monthly Income
+    extracted_gross_income = Column(Float, nullable=True)
+    extracted_net_income = Column(Float, nullable=True)
+    basic_salary = Column(Float, nullable=True)
+    allowances = Column(Float, nullable=True)
+    total_deductions = Column(Float, nullable=True)
     extracted_metadata_json = Column(Text, nullable=True)
     extraction_confidence = Column(Float, default=0.0)
     status = Column(String, default="UNVERIFIED")  # UNVERIFIED / EVIDENCE_CHECKED / SOURCE_VERIFIED / MANUAL_REVIEW
@@ -113,7 +118,12 @@ class BorrowerVerification(Base):
     declared_monthly_income = Column(Float, default=0.0)
     declared_monthly_debt = Column(Float, default=0.0)
     declared_employment_years = Column(Float, default=0.0)
-    extracted_monthly_income = Column(Float, default=0.0)
+    extracted_monthly_income = Column(Float, default=0.0)  # Primary Gross Monthly Income
+    extracted_gross_monthly_income = Column(Float, default=0.0)
+    extracted_net_monthly_income = Column(Float, default=0.0)
+    basic_salary = Column(Float, default=0.0)
+    allowances = Column(Float, default=0.0)
+    total_deductions = Column(Float, default=0.0)
     discrepancy_percentage = Column(Float, default=0.0)
     status = Column(String, default="UNVERIFIED")  # UNVERIFIED / EVIDENCE_CHECKED / SOURCE_VERIFIED / MANUAL_REVIEW
     record_hash = Column(String, nullable=True)  # Keccak256 / SHA256 of canonical report

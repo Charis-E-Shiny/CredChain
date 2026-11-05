@@ -78,9 +78,17 @@ class CreditAssessmentResponse(BaseModel):
 
     # Verification Layer attributes
     verification_status: str = Field(default="UNVERIFIED", description="UNVERIFIED / EVIDENCE_CHECKED / SOURCE_VERIFIED / MANUAL_REVIEW")
+    raw_risk_score: Optional[float] = Field(default=None, description="Base ML model risk score before verification adjustment")
+    verification_adjustment: Optional[float] = Field(default=0.0, description="Score delta applied based on verification status")
+    verification_score_adjustment: Optional[float] = Field(default=0.0, description="Score delta applied based on verification status")
     declared_income: float = Field(default=0.0, description="Declared annual income")
+    declared_gross_monthly_income: Optional[float] = Field(default=0.0, description="Declared gross monthly income")
     extracted_income: Optional[float] = Field(default=None, description="Extracted annual income from evidence")
+    extracted_gross_monthly_income: Optional[float] = Field(default=None, description="Extracted gross monthly income from evidence")
+    extracted_net_monthly_income: Optional[float] = Field(default=None, description="Extracted net monthly income from evidence")
     income_discrepancy_percentage: Optional[float] = Field(default=None, description="Percentage discrepancy between declared and extracted")
+    reconciliation_variance: Optional[float] = Field(default=None, description="Alias for income_discrepancy_percentage")
+    verification_notes: Optional[str] = Field(default=None, description="Verification notes or discrepancy report details")
     requires_manual_review: bool = Field(default=False, description="Flag indicating human review requirement")
 
     model_config = {"from_attributes": True}

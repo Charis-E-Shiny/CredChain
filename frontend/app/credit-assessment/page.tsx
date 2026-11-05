@@ -594,11 +594,28 @@ export default function MergedAssessmentVerificationPage() {
                   <div className="p-3.5 rounded-xl border border-[#E5E1D7] bg-[#F4F1E8]/40 flex items-center justify-between">
                     <div>
                       <div className="text-[10px] text-[#777B73] uppercase tracking-wider font-semibold">
-                        Predicted Default Probability
+                        Assessed Default Probability
                       </div>
                       <div className="text-2xl font-black font-mono text-[#252C29]">
                         {(assessment.risk_score * 100).toFixed(1)}%
                       </div>
+                      {assessment.raw_risk_score !== undefined && assessment.raw_risk_score !== null && (
+                        <div className="text-[10px] text-[#777B73]">
+                          Base ML: {(assessment.raw_risk_score * 100).toFixed(1)}%
+                          {assessment.verification_adjustment ? (
+                            <span
+                              className={`ml-1 font-semibold ${
+                                assessment.verification_adjustment < 0
+                                  ? "text-[#34765A]"
+                                  : "text-[#B94B45]"
+                              }`}
+                            >
+                              ({assessment.verification_adjustment > 0 ? "+" : ""}
+                              {(assessment.verification_adjustment * 100).toFixed(1)}% verif)
+                            </span>
+                          ) : null}
+                        </div>
+                      )}
                     </div>
                     <div className="text-right">
                       <div className="text-[10px] text-[#777B73] uppercase tracking-wider font-semibold">
@@ -618,13 +635,73 @@ export default function MergedAssessmentVerificationPage() {
                     </div>
                   </div>
 
+                  {/* Verification Integration Status Card */}
+                  <div className="p-3 rounded-lg border border-[#E5E1D7] bg-white space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-[#777B73] uppercase tracking-wider flex items-center gap-1.5">
+                        <ShieldCheck className="h-3.5 w-3.5 text-[#183B32]" />
+                        Verification Layer Impact
+                      </span>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                          (assessment.verification_status || verData?.status) === "SOURCE_VERIFIED"
+                            ? "bg-[#34765A]/10 text-[#34765A] border border-[#34765A]/30"
+                            : (assessment.verification_status || verData?.status) === "EVIDENCE_CHECKED"
+                            ? "bg-[#315B4C]/10 text-[#315B4C] border border-[#315B4C]/30"
+                            : (assessment.verification_status || verData?.status) === "MANUAL_REVIEW"
+                            ? "bg-[#B94B45]/10 text-[#B94B45] border border-[#B94B45]/30"
+                            : "bg-[#B77B26]/10 text-[#B77B26] border border-[#B77B26]/30"
+                        }`}
+                      >
+                        {assessment.verification_status || verData?.status || "UNVERIFIED"}
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-[#252C29] leading-relaxed">
+                      {assessment.eligibility}
+                    </p>
+
+                    {(assessment.extracted_gross_monthly_income || verData?.extracted_gross_monthly_income) ? (
+                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-[#E5E1D7] text-[10px]">
+                        <div>
+                          <span className="text-[#777B73]">Declared Gross:</span>{" "}
+                          <span className="font-mono font-semibold text-[#252C29]">
+                            ${(assessment.declared_gross_monthly_income || (parseFloat(formData.annual_income) / 12)).toFixed(2)}/mo
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[#777B73]">Extracted Gross:</span>{" "}
+                          <span className="font-mono font-semibold text-[#34765A]">
+                            ${(assessment.extracted_gross_monthly_income || verData?.extracted_gross_monthly_income || 0).toFixed(2)}/mo
+                          </span>
+                        </div>
+                        {assessment.extracted_net_monthly_income ? (
+                          <div>
+                            <span className="text-[#777B73]">Extracted Net:</span>{" "}
+                            <span className="font-mono font-medium text-[#252C29]">
+                              ${assessment.extracted_net_monthly_income.toFixed(2)}/mo
+                            </span>
+                          </div>
+                        ) : null}
+                        {assessment.reconciliation_variance !== undefined && assessment.reconciliation_variance !== null ? (
+                          <div>
+                            <span className="text-[#777B73]">Variance:</span>{" "}
+                            <span className="font-mono font-bold text-[#34765A]">
+                              {assessment.reconciliation_variance.toFixed(2)}%
+                            </span>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+
                   {assessment.contributing_factors?.length > 0 && (
                     <div className="space-y-1">
                       <span className="text-[11px] font-semibold text-[#777B73] uppercase tracking-wider">
-                        Top Contributing Factors (SHAP)
+                        Risk Factor Contributions
                       </span>
                       <div className="space-y-1">
-                        {assessment.contributing_factors.slice(0, 3).map((f, i) => (
+                        {assessment.contributing_factors.slice(0, 4).map((f, i) => (
                           <div
                             key={i}
                             className="flex justify-between items-center p-2 rounded-lg bg-[#F4F1E8]/30 border border-[#E5E1D7] text-[11px]"
@@ -635,7 +712,7 @@ export default function MergedAssessmentVerificationPage() {
                                 f.direction === "positive" ? "text-[#B94B45]" : "text-[#34765A]"
                               }`}
                             >
-                              {(f.importance_value * 100).toFixed(1)}% ({f.direction})
+                              {(f.importance_value * 100).toFixed(1)}% ({f.direction === "negative" ? "risk discount" : "risk loading"})
                             </span>
                           </div>
                         ))}
@@ -826,20 +903,55 @@ export default function MergedAssessmentVerificationPage() {
 
               {/* Discrepancy Report Result */}
               {(discrepancy || (verData && verData.extracted_monthly_income > 0)) && (
-                <div className="p-4 rounded-xl border border-[#E5E1D7] bg-[#F4F1E8]/40 space-y-2 text-xs">
+                <div className="p-4 rounded-xl border border-[#E5E1D7] bg-[#F4F1E8]/40 space-y-2.5 text-xs">
                   <div className="flex justify-between items-center">
-                    <span className="text-[#777B73]">Declared Monthly:</span>
+                    <span className="text-[#777B73]">Declared Gross Monthly:</span>
                     <span className="font-mono font-semibold text-[#252C29]">
                       ${(discrepancy ? discrepancy.declared_monthly_income : verData?.declared_monthly_income || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </span>
                   </div>
 
                   <div className="flex justify-between items-center">
-                    <span className="text-[#777B73]">Extracted Monthly (OCR):</span>
-                    <span className="font-mono font-semibold text-[#252C29]">
-                      ${(discrepancy ? discrepancy.extracted_monthly_income : verData?.extracted_monthly_income || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    <span className="text-[#777B73]">Extracted Gross Monthly:</span>
+                    <span className="font-mono font-semibold text-[#34765A]">
+                      ${((discrepancy ? (discrepancy.extracted_gross_monthly_income || discrepancy.extracted_monthly_income) : (verData?.extracted_gross_monthly_income || verData?.extracted_monthly_income)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </span>
                   </div>
+
+                  {(discrepancy?.extracted_net_monthly_income || verData?.extracted_net_monthly_income) ? (
+                    <div className="flex justify-between items-center">
+                      <span className="text-[#777B73]">Extracted Net Monthly:</span>
+                      <span className="font-mono font-medium text-[#252C29]">
+                        ${(discrepancy?.extracted_net_monthly_income || verData?.extracted_net_monthly_income || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  ) : null}
+
+                  {/* Component Breakdown */}
+                  {((discrepancy?.basic_salary || verData?.basic_salary) ||
+                    (discrepancy?.allowances || verData?.allowances) ||
+                    (discrepancy?.total_deductions || verData?.total_deductions)) && (
+                    <div className="pt-2 border-t border-[#E5E1D7]/60 grid grid-cols-3 gap-2 text-[10px] text-center">
+                      <div className="p-1 rounded bg-white border border-[#E5E1D7]">
+                        <span className="text-[#777B73] block">Basic Salary</span>
+                        <span className="font-mono font-bold text-[#252C29]">
+                          ${(discrepancy?.basic_salary || verData?.basic_salary || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="p-1 rounded bg-white border border-[#E5E1D7]">
+                        <span className="text-[#777B73] block">Allowances</span>
+                        <span className="font-mono font-bold text-[#34765A]">
+                          +${(discrepancy?.allowances || verData?.allowances || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="p-1 rounded bg-white border border-[#E5E1D7]">
+                        <span className="text-[#777B73] block">Deductions</span>
+                        <span className="font-mono font-bold text-[#B94B45]">
+                          -${(discrepancy?.total_deductions || verData?.total_deductions || 0).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="border-t border-[#E5E1D7] pt-2 flex justify-between items-center">
                     <span className="text-[#777B73]">Reconciliation Variance:</span>
@@ -851,6 +963,21 @@ export default function MergedAssessmentVerificationPage() {
                       }`}
                     >
                       {(discrepancy ? discrepancy.discrepancy_percentage : verData?.discrepancy_percentage || 0).toFixed(2)}% (Tolerance ±5.0%)
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center text-[11px] pt-1 border-t border-[#E5E1D7]">
+                    <span className="text-[#777B73]">Evidence Verification Status:</span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        (discrepancy ? discrepancy.status : verData?.status) === "EVIDENCE_CHECKED"
+                          ? "bg-[#315B4C]/10 text-[#315B4C]"
+                          : (discrepancy ? discrepancy.status : verData?.status) === "SOURCE_VERIFIED"
+                          ? "bg-[#34765A]/10 text-[#34765A]"
+                          : "bg-[#B94B45]/10 text-[#B94B45]"
+                      }`}
+                    >
+                      {discrepancy ? discrepancy.status : verData?.status}
                     </span>
                   </div>
                 </div>

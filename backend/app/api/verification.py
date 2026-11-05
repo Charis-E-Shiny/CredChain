@@ -62,9 +62,14 @@ async def upload_verification_document(
         )
 
         income_msg = (
-            f"Extracted income: ₹{doc_record.extracted_income:,.2f}"
-            if doc_record.extracted_income
-            else "Text extracted; queued for discrepancy comparison."
+            f"Extracted Gross: ${doc_record.extracted_gross_income:,.2f}"
+            + (f", Net: ${doc_record.extracted_net_income:,.2f}" if doc_record.extracted_net_income else "")
+            if doc_record.extracted_gross_income
+            else (
+                f"Extracted Net: ${doc_record.extracted_net_income:,.2f} (Gross pay required)"
+                if doc_record.extracted_net_income
+                else "Text extracted; queued for discrepancy comparison."
+            )
         )
 
         return DocumentUploadResponse(
@@ -74,6 +79,8 @@ async def upload_verification_document(
             file_size_bytes=doc_record.file_size_bytes,
             document_type=doc_record.document_type,
             status=doc_record.status,
+            extracted_gross_income=doc_record.extracted_gross_income,
+            extracted_net_income=doc_record.extracted_net_income,
             message=f"Document uploaded and processed successfully. {income_msg}",
         )
     except Exception as exc:

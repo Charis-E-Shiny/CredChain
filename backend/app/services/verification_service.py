@@ -1,5 +1,7 @@
 """
 Borrower Financial Verification Layer evaluation and rule-based status engine.
+Reconciles declared gross monthly income against extracted evidence gross income.
+Stores and displays net salary separately without substituting net for gross.
 """
 
 import hashlib
@@ -20,7 +22,7 @@ from app.schemas.verification_schema import (
     VerificationStatusEnum,
     VerificationStatusResponse,
 )
-from app.services.document_processing import DocumentProcessor
+from app.services.document_processing import DocumentProcessor, PayrollExtractionResult
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +65,7 @@ class VerificationService:
         original_filename: str,
         document_type: str = "salary_slip",
     ) -> VerificationDocument:
-        """Securely store an uploaded document and run extraction."""
+        """Securely store an uploaded document and run independent payroll component extraction."""
         clean_wallet = wallet_address.lower().strip()
         wallet_folder = os.path.join(UPLOAD_DIR, clean_wallet)
         os.makedirs(wallet_folder, exist_ok=True)
@@ -86,12 +88,8 @@ class VerificationService:
             os.remove(target_path)
             raise ValueError("File exceeds maximum allowed limit of 10 MB.")
 
-        # Process and extract financial figures
-        extracted_text, extracted_income, detected_credits, confidence = DocumentProcessor.process_file(
-            target_path, ext
-        )
-
-        initial_status = "EVIDENCE_CHECKED" if extracted_income is not None else "MANUAL_REVIEW"
+        # Process and extract independent financial values
+        extraction: PayrollExtractionResult = DocumentProcessor.process_file(target_path, ext)
 
         doc_record = VerificationDocument(
             id=doc_id,
@@ -101,11 +99,21 @@ class VerificationService:
             file_type=ext,
             file_size_bytes=file_size,
             document_type=document_type,
-            extracted_text=extracted_text[:2000] if extracted_text else "",
-            extracted_income=extracted_income,
-            extracted_metadata_json=json.dumps({"detected_credits": detected_credits}),
-            extraction_confidence=confidence,
-            status=initial_status,
+            extracted_text=extraction.text[:2000] if extraction.text else "",
+            # Primary comparison income is Gross Monthly Salary
+            extracted_income=extraction.gross_monthly_salary,
+            extracted_gross_income=extraction.gross_monthly_salary,
+            extracted_net_income=extraction.net_monthly_salary,
+            basic_salary=extraction.basic_salary,
+            allowances=extraction.allowances,
+            total_deductions=extraction.total_deductions,
+            extracted_metadata_json=json.dumps({
+                "detected_credits": extraction.detected_credits,
+                "notes": extraction.notes,
+                "is_gross_identified": extraction.is_gross_identified,
+            }),
+            extraction_confidence=extraction.confidence,
+            status=extraction.status_flag,
         )
         db.add(doc_record)
         db.commit()
@@ -163,10 +171,17 @@ class VerificationService:
                 if bv.status != VerificationStatusEnum.SOURCE_VERIFIED.value:
                     bv.status = VerificationStatusEnum.UNVERIFIED.value
                     bv.extracted_monthly_income = 0.0
+                    bv.extracted_gross_monthly_income = 0.0
+                    bv.extracted_net_monthly_income = 0.0
+                    bv.basic_salary = 0.0
+                    bv.allowances = 0.0
+                    bv.total_deductions = 0.0
                     bv.discrepancy_percentage = 0.0
                     bv.verifier_notes = "All evidence documents removed. Verification reset to UNVERIFIED."
                     now_iso = datetime.now(timezone.utc).isoformat()
-                    bv.record_hash = _canonical_record_hash(clean_wallet, bv.status, bv.declared_monthly_income, 0.0, 0.0, now_iso)
+                    bv.record_hash = _canonical_record_hash(
+                        clean_wallet, bv.status, bv.declared_monthly_income, 0.0, 0.0, now_iso
+                    )
             else:
                 # Re-evaluate with remaining documents if not SOURCE_VERIFIED
                 if bv.status != VerificationStatusEnum.SOURCE_VERIFIED.value:
@@ -202,11 +217,13 @@ class VerificationService:
         tolerance_percentage: float = 5.0,
     ) -> DiscrepancyReport:
         """
-        Compare declared income with extracted evidence values.
-        Applies tolerance threshold to determine verification status.
+        Compare declared gross monthly income with extracted evidence gross monthly income.
+        Never substitutes net salary for gross salary.
+        Calculates variance: abs(declared_gross - extracted_gross) / declared_gross * 100.
+        Preserves ±5% tolerance threshold.
         """
         clean_wallet = wallet_address.lower().strip()
-        declared_monthly = declared_annual_income / 12.0
+        declared_gross_monthly = declared_annual_income / 12.0
 
         # Retrieve all uploaded documents for this borrower
         docs: List[VerificationDocument] = (
@@ -215,46 +232,89 @@ class VerificationService:
             .all()
         )
 
-        all_detected_credits = []
+        gross_salaries: List[float] = []
+        net_salaries: List[float] = []
+        basic_salaries: List[float] = []
+        allowances_list: List[float] = []
+        deductions_list: List[float] = []
+        all_detected_credits: List[float] = []
+
         for d in docs:
-            if d.extracted_income:
-                all_detected_credits.append(d.extracted_income)
+            if d.extracted_gross_income is not None and d.extracted_gross_income > 0:
+                gross_salaries.append(d.extracted_gross_income)
+                if d.extracted_gross_income not in all_detected_credits:
+                    all_detected_credits.append(d.extracted_gross_income)
+            elif d.extracted_income is not None and d.extracted_income > 0:
+                # Fallback to extracted_income if extracted_gross_income was not populated
+                gross_salaries.append(d.extracted_income)
+                if d.extracted_income not in all_detected_credits:
+                    all_detected_credits.append(d.extracted_income)
+
+            if d.extracted_net_income is not None and d.extracted_net_income > 0:
+                net_salaries.append(d.extracted_net_income)
+                if d.extracted_net_income not in all_detected_credits:
+                    all_detected_credits.append(d.extracted_net_income)
+
+            if d.basic_salary is not None and d.basic_salary > 0:
+                basic_salaries.append(d.basic_salary)
+            if d.allowances is not None and d.allowances > 0:
+                allowances_list.append(d.allowances)
+            if d.total_deductions is not None and d.total_deductions > 0:
+                deductions_list.append(d.total_deductions)
+
+        extracted_gross = 0.0
+        extracted_net = (sum(net_salaries) / len(net_salaries)) if net_salaries else None
+        avg_basic = (sum(basic_salaries) / len(basic_salaries)) if basic_salaries else None
+        avg_allowances = (sum(allowances_list) / len(allowances_list)) if allowances_list else None
+        avg_deductions = (sum(deductions_list) / len(deductions_list)) if deductions_list else None
 
         if not docs:
-            # No documents submitted
+            # Case 1: No documents submitted
             status = VerificationStatusEnum.UNVERIFIED
             explanation = "No supporting financial evidence uploaded yet. Self-declared figures only."
-            extracted_monthly = 0.0
             discrepancy = 100.0
             is_within_tol = False
             requires_manual = False
-        elif not all_detected_credits:
-            # Documents uploaded but extraction failed to find reliable values
+
+        elif not gross_salaries:
+            # Case 2: Documents present, but gross salary could not be identified confidently
             status = VerificationStatusEnum.MANUAL_REVIEW
-            explanation = "Document text extraction could not detect clear income figures. Requires manual verification."
-            extracted_monthly = 0.0
             discrepancy = 100.0
             is_within_tol = False
             requires_manual = True
+
+            if net_salaries:
+                explanation = (
+                    f"Net take-home pay (${extracted_net:,.2f}/mo) was identified, but Gross Monthly Salary "
+                    f"could not be identified with confidence. Gross salary is strictly required to reconcile "
+                    f"against declared gross income (${declared_gross_monthly:,.2f}/mo). Flagged for manual review."
+                )
+            else:
+                explanation = (
+                    "Document text extraction could not detect clear gross monthly salary figures. "
+                    "Requires manual verification."
+                )
+
         else:
-            # Average of detected income credits across evidence
-            extracted_monthly = sum(all_detected_credits) / len(all_detected_credits)
-            discrepancy = (abs(declared_monthly - extracted_monthly) / declared_monthly) * 100.0
+            # Case 3: Confident Gross Salary identified from evidence
+            extracted_gross = sum(gross_salaries) / len(gross_salaries)
+            discrepancy = (abs(declared_gross_monthly - extracted_gross) / declared_gross_monthly) * 100.0
 
             if discrepancy <= tolerance_percentage:
                 status = VerificationStatusEnum.EVIDENCE_CHECKED
+                net_note = f" Net take-home pay verified at ${extracted_net:,.2f}/mo." if extracted_net else ""
                 explanation = (
-                    f"Evidence matched. Extracted income (₹{extracted_monthly:,.2f}/mo) aligns with declared "
-                    f"income (₹{declared_monthly:,.2f}/mo) within configured {tolerance_percentage}% tolerance "
-                    f"({discrepancy:.2f}% variance)."
+                    f"Evidence matched. Extracted gross income (${extracted_gross:,.2f}/mo) aligns with declared "
+                    f"gross income (${declared_gross_monthly:,.2f}/mo) within configured {tolerance_percentage}% tolerance "
+                    f"({discrepancy:.2f}% variance).{net_note}"
                 )
                 is_within_tol = True
                 requires_manual = False
             else:
                 status = VerificationStatusEnum.MANUAL_REVIEW
                 explanation = (
-                    f"Discrepancy detected: Declared ₹{declared_monthly:,.2f}/mo vs extracted evidence "
-                    f"₹{extracted_monthly:,.2f}/mo ({discrepancy:.2f}% variance exceeds {tolerance_percentage}% tolerance). "
+                    f"Discrepancy detected: Declared gross ${declared_gross_monthly:,.2f}/mo vs extracted evidence gross "
+                    f"${extracted_gross:,.2f}/mo ({discrepancy:.2f}% variance exceeds {tolerance_percentage}% tolerance). "
                     f"Sent for manual review."
                 )
                 is_within_tol = False
@@ -265,8 +325,8 @@ class VerificationService:
         rec_hash = _canonical_record_hash(
             clean_wallet,
             status.value,
-            declared_monthly,
-            extracted_monthly,
+            declared_gross_monthly,
+            extracted_gross,
             discrepancy,
             now_iso,
         )
@@ -284,10 +344,15 @@ class VerificationService:
             bv = BorrowerVerification(
                 wallet_address=clean_wallet,
                 declared_annual_income=declared_annual_income,
-                declared_monthly_income=round(declared_monthly, 2),
+                declared_monthly_income=round(declared_gross_monthly, 2),
                 declared_monthly_debt=declared_monthly_debt,
                 declared_employment_years=declared_employment_years,
-                extracted_monthly_income=round(extracted_monthly, 2),
+                extracted_monthly_income=round(extracted_gross, 2),
+                extracted_gross_monthly_income=round(extracted_gross, 2),
+                extracted_net_monthly_income=round(extracted_net, 2) if extracted_net else 0.0,
+                basic_salary=round(avg_basic, 2) if avg_basic else 0.0,
+                allowances=round(avg_allowances, 2) if avg_allowances else 0.0,
+                total_deductions=round(avg_deductions, 2) if avg_deductions else 0.0,
                 discrepancy_percentage=round(discrepancy, 2),
                 status=status.value,
                 record_hash=rec_hash,
@@ -295,16 +360,21 @@ class VerificationService:
             )
             db.add(bv)
         else:
-            # If already SOURCE_VERIFIED by admin, preserve it unless explicitly overwritten
+            # If already SOURCE_VERIFIED by admin/authorized feed, preserve it
             if bv.status == VerificationStatusEnum.SOURCE_VERIFIED.value:
                 status = VerificationStatusEnum.SOURCE_VERIFIED
             else:
                 bv.status = status.value
             bv.declared_annual_income = declared_annual_income
-            bv.declared_monthly_income = round(declared_monthly, 2)
+            bv.declared_monthly_income = round(declared_gross_monthly, 2)
             bv.declared_monthly_debt = declared_monthly_debt
             bv.declared_employment_years = declared_employment_years
-            bv.extracted_monthly_income = round(extracted_monthly, 2)
+            bv.extracted_monthly_income = round(extracted_gross, 2)
+            bv.extracted_gross_monthly_income = round(extracted_gross, 2)
+            bv.extracted_net_monthly_income = round(extracted_net, 2) if extracted_net else 0.0
+            bv.basic_salary = round(avg_basic, 2) if avg_basic else 0.0
+            bv.allowances = round(avg_allowances, 2) if avg_allowances else 0.0
+            bv.total_deductions = round(avg_deductions, 2) if avg_deductions else 0.0
             bv.discrepancy_percentage = round(discrepancy, 2)
             bv.record_hash = rec_hash
             bv.verifier_notes = explanation
@@ -323,8 +393,13 @@ class VerificationService:
 
         return DiscrepancyReport(
             declared_annual_income=round(declared_annual_income, 2),
-            declared_monthly_income=round(declared_monthly, 2),
-            extracted_monthly_income=round(extracted_monthly, 2),
+            declared_monthly_income=round(declared_gross_monthly, 2),
+            extracted_monthly_income=round(extracted_gross, 2),
+            extracted_gross_monthly_income=round(extracted_gross, 2),
+            extracted_net_monthly_income=round(extracted_net, 2) if extracted_net else None,
+            basic_salary=round(avg_basic, 2) if avg_basic else None,
+            allowances=round(avg_allowances, 2) if avg_allowances else None,
+            total_deductions=round(avg_deductions, 2) if avg_deductions else None,
             discrepancy_percentage=round(discrepancy, 2),
             tolerance_percentage=tolerance_percentage,
             is_within_tolerance=is_within_tol,
@@ -362,14 +437,18 @@ class VerificationService:
                 document_type=d.document_type,
                 upload_timestamp=d.upload_timestamp.isoformat() if d.upload_timestamp else "",
                 status=d.status,
-                extracted_income=d.extracted_income,
+                extracted_income=d.extracted_gross_income or d.extracted_income,
+                extracted_gross_income=d.extracted_gross_income,
+                extracted_net_income=d.extracted_net_income,
+                basic_salary=d.basic_salary,
+                allowances=d.allowances,
+                total_deductions=d.total_deductions,
                 extraction_confidence=d.extraction_confidence,
             )
             for d in docs
         ]
 
         if not bv:
-            # Default unverified profile
             return VerificationStatusResponse(
                 wallet_address=clean_wallet,
                 status=VerificationStatusEnum.UNVERIFIED,
@@ -378,6 +457,11 @@ class VerificationService:
                 declared_monthly_debt=0.0,
                 declared_employment_years=0.0,
                 extracted_monthly_income=0.0,
+                extracted_gross_monthly_income=0.0,
+                extracted_net_monthly_income=None,
+                basic_salary=None,
+                allowances=None,
+                total_deductions=None,
                 discrepancy_percentage=0.0,
                 tolerance_percentage=5.0,
                 record_hash=None,
@@ -411,7 +495,12 @@ class VerificationService:
             declared_monthly_income=bv.declared_monthly_income,
             declared_monthly_debt=bv.declared_monthly_debt,
             declared_employment_years=bv.declared_employment_years,
-            extracted_monthly_income=bv.extracted_monthly_income,
+            extracted_monthly_income=bv.extracted_gross_monthly_income or bv.extracted_monthly_income,
+            extracted_gross_monthly_income=bv.extracted_gross_monthly_income or bv.extracted_monthly_income,
+            extracted_net_monthly_income=bv.extracted_net_monthly_income if (bv.extracted_net_monthly_income and bv.extracted_net_monthly_income > 0) else None,
+            basic_salary=bv.basic_salary if (bv.basic_salary and bv.basic_salary > 0) else None,
+            allowances=bv.allowances if (bv.allowances and bv.allowances > 0) else None,
+            total_deductions=bv.total_deductions if (bv.total_deductions and bv.total_deductions > 0) else None,
             discrepancy_percentage=bv.discrepancy_percentage,
             tolerance_percentage=5.0,
             record_hash=bv.record_hash,
@@ -451,7 +540,7 @@ class VerificationService:
             clean_wallet,
             target_status.value,
             bv.declared_monthly_income if bv else 0.0,
-            bv.extracted_monthly_income if bv else 0.0,
+            bv.extracted_gross_monthly_income if bv else 0.0,
             bv.discrepancy_percentage if bv else 0.0,
             now_iso,
         )

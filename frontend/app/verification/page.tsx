@@ -491,15 +491,26 @@ export default function VerificationPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {doc.extracted_income ? (
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-[#34765A]/10 text-[#34765A]">
-                            Extracted: ${doc.extracted_income.toLocaleString()}
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-[#B77B26]/10 text-[#B77B26]">
-                            Manual Review
-                          </span>
-                        )}
+                        <div className="text-right">
+                          {doc.extracted_gross_income ? (
+                            <div className="text-[10px] font-semibold text-[#34765A]">
+                              Gross: ${doc.extracted_gross_income.toLocaleString()}
+                            </div>
+                          ) : doc.extracted_income ? (
+                            <div className="text-[10px] font-semibold text-[#34765A]">
+                              Gross: ${doc.extracted_income.toLocaleString()}
+                            </div>
+                          ) : (
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-[#B77B26]/10 text-[#B77B26]">
+                              Manual Review
+                            </span>
+                          )}
+                          {doc.extracted_net_income && (
+                            <div className="text-[10px] text-[#777B73]">
+                              Net: ${doc.extracted_net_income.toLocaleString()}
+                            </div>
+                          )}
+                        </div>
 
                         <button
                           type="button"
@@ -561,27 +572,60 @@ export default function VerificationPage() {
               <div className="space-y-4">
                 <div className="p-4 rounded-xl border border-[#E5E1D7] bg-[#F4F1E8]/40 space-y-3">
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-[#777B73]">Declared Monthly:</span>
+                    <span className="text-[#777B73] font-medium">Declared Gross Monthly Income:</span>
                     <span className="font-mono font-semibold text-[#252C29]">
                       $
-                      {discrepancy.declared_monthly_income.toLocaleString(
+                      {(discrepancy.declared_monthly_income).toLocaleString(
                         undefined,
                         { minimumFractionDigits: 2 }
                       )}
                     </span>
                   </div>
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-[#777B73]">Extracted (OCR):</span>
-                    <span className="font-mono font-semibold text-[#252C29]">
+                    <span className="text-[#777B73] font-medium">Extracted Gross Monthly Income:</span>
+                    <span className="font-mono font-semibold text-[#34765A]">
                       $
-                      {discrepancy.extracted_monthly_income.toLocaleString(
+                      {(discrepancy.extracted_gross_monthly_income || discrepancy.extracted_monthly_income).toLocaleString(
                         undefined,
                         { minimumFractionDigits: 2 }
                       )}
                     </span>
                   </div>
+                  {discrepancy.extracted_net_monthly_income ? (
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-[#777B73]">Extracted Net Monthly Income:</span>
+                      <span className="font-mono font-medium text-[#252C29]">
+                        ${discrepancy.extracted_net_monthly_income.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  ) : null}
+
+                  {/* Component Breakdown */}
+                  {(discrepancy.basic_salary || discrepancy.allowances || discrepancy.total_deductions) && (
+                    <div className="pt-2 border-t border-[#E5E1D7]/60 grid grid-cols-3 gap-2 text-[10px] text-center">
+                      <div className="p-1.5 rounded bg-white border border-[#E5E1D7]">
+                        <span className="text-[#777B73] block">Basic Salary</span>
+                        <span className="font-mono font-bold text-[#252C29]">
+                          ${(discrepancy.basic_salary || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="p-1.5 rounded bg-white border border-[#E5E1D7]">
+                        <span className="text-[#777B73] block">Allowances</span>
+                        <span className="font-mono font-bold text-[#34765A]">
+                          +${(discrepancy.allowances || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="p-1.5 rounded bg-white border border-[#E5E1D7]">
+                        <span className="text-[#777B73] block">Deductions</span>
+                        <span className="font-mono font-bold text-[#B94B45]">
+                          -${(discrepancy.total_deductions || 0).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="border-t border-[#E5E1D7] pt-2 flex justify-between items-center text-xs">
-                    <span className="text-[#777B73]">Variance:</span>
+                    <span className="text-[#777B73] font-medium">Reconciliation Variance:</span>
                     <span
                       className={`font-mono font-bold ${
                         discrepancy.is_within_tolerance
@@ -593,7 +637,7 @@ export default function VerificationPage() {
                     </span>
                   </div>
                   <div className="flex justify-between items-center text-[11px]">
-                    <span className="text-[#777B73]">Tolerance:</span>
+                    <span className="text-[#777B73]">Tolerance Window:</span>
                     <span className="font-mono text-[#777B73]">
                       ±{discrepancy.tolerance_percentage}%
                     </span>
@@ -604,7 +648,7 @@ export default function VerificationPage() {
                 {discrepancy.detected_credits.length > 0 && (
                   <div className="space-y-1.5">
                     <span className="text-[11px] font-semibold text-[#777B73] uppercase tracking-wider">
-                      Detected Credits
+                      Detected Payroll Line Items
                     </span>
                     <div className="flex flex-wrap gap-1.5">
                       {discrepancy.detected_credits.map((c, i) => (
@@ -619,24 +663,42 @@ export default function VerificationPage() {
                   </div>
                 )}
 
-                {/* Verdict */}
+                {/* Verdict & Evidence Verification Status */}
                 {discrepancy.is_within_tolerance ? (
-                  <div className="p-3 rounded-lg border border-[#34765A]/20 bg-[#34765A]/10 text-xs text-[#34765A] space-y-1">
-                    <div className="font-semibold flex items-center gap-1.5">
-                      <CheckCircle2 className="h-4 w-4" />
-                      Reconciliation Satisfied
+                  <div className="p-3.5 rounded-lg border border-[#34765A]/20 bg-[#34765A]/10 text-xs text-[#34765A] space-y-1.5">
+                    <div className="font-semibold flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <CheckCircle2 className="h-4 w-4" />
+                        Evidence Verification Status
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-[#34765A] text-white text-[10px] font-bold">
+                        {discrepancy.status}
+                      </span>
                     </div>
-                    <p className="text-[11px] leading-relaxed">
+                    <p className="text-[11px] leading-relaxed text-[#252C29]">
                       {discrepancy.explanation}
                     </p>
+                    <div className="pt-1.5 border-t border-[#34765A]/20 flex justify-end">
+                      <Link
+                        href="/credit-assessment"
+                        className="text-[11px] font-bold text-[#183B32] hover:underline flex items-center gap-1"
+                      >
+                        View AI Assessment Risk Discount <ChevronRight className="h-3 w-3" />
+                      </Link>
+                    </div>
                   </div>
                 ) : (
-                  <div className="p-3 rounded-lg border border-[#B94B45]/20 bg-[#B94B45]/10 text-xs text-[#B94B45] space-y-1">
-                    <div className="font-semibold flex items-center gap-1.5">
-                      <AlertTriangle className="h-4 w-4" />
-                      Discrepancy Detected
+                  <div className="p-3.5 rounded-lg border border-[#B94B45]/20 bg-[#B94B45]/10 text-xs text-[#B94B45] space-y-1">
+                    <div className="font-semibold flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <AlertTriangle className="h-4 w-4" />
+                        Evidence Verification Status
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-[#B94B45] text-white text-[10px] font-bold">
+                        {discrepancy.status}
+                      </span>
                     </div>
-                    <p className="text-[11px] leading-relaxed">
+                    <p className="text-[11px] leading-relaxed text-[#252C29]">
                       {discrepancy.explanation}
                     </p>
                   </div>
@@ -646,7 +708,7 @@ export default function VerificationPage() {
               <div className="space-y-3">
                 <div className="p-4 rounded-xl border border-[#E5E1D7] bg-[#F4F1E8]/40 space-y-3">
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-[#777B73]">Declared Monthly:</span>
+                    <span className="text-[#777B73] font-medium">Declared Gross Monthly Income:</span>
                     <span className="font-mono font-semibold text-[#252C29]">
                       $
                       {verData.declared_monthly_income.toLocaleString(
@@ -656,17 +718,50 @@ export default function VerificationPage() {
                     </span>
                   </div>
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-[#777B73]">Extracted (OCR):</span>
-                    <span className="font-mono font-semibold text-[#252C29]">
+                    <span className="text-[#777B73] font-medium">Extracted Gross Monthly Income:</span>
+                    <span className="font-mono font-semibold text-[#34765A]">
                       $
-                      {verData.extracted_monthly_income.toLocaleString(
+                      {(verData.extracted_gross_monthly_income || verData.extracted_monthly_income).toLocaleString(
                         undefined,
                         { minimumFractionDigits: 2 }
                       )}
                     </span>
                   </div>
+                  {verData.extracted_net_monthly_income ? (
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-[#777B73]">Extracted Net Monthly Income:</span>
+                      <span className="font-mono font-medium text-[#252C29]">
+                        ${verData.extracted_net_monthly_income.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  ) : null}
+
+                  {/* Component Breakdown */}
+                  {(verData.basic_salary || verData.allowances || verData.total_deductions) && (
+                    <div className="pt-2 border-t border-[#E5E1D7]/60 grid grid-cols-3 gap-2 text-[10px] text-center">
+                      <div className="p-1.5 rounded bg-white border border-[#E5E1D7]">
+                        <span className="text-[#777B73] block">Basic Salary</span>
+                        <span className="font-mono font-bold text-[#252C29]">
+                          ${(verData.basic_salary || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="p-1.5 rounded bg-white border border-[#E5E1D7]">
+                        <span className="text-[#777B73] block">Allowances</span>
+                        <span className="font-mono font-bold text-[#34765A]">
+                          +${(verData.allowances || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="p-1.5 rounded bg-white border border-[#E5E1D7]">
+                        <span className="text-[#777B73] block">Deductions</span>
+                        <span className="font-mono font-bold text-[#B94B45]">
+                          -${(verData.total_deductions || 0).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="border-t border-[#E5E1D7] pt-2 flex justify-between items-center text-xs">
-                    <span className="text-[#777B73]">Variance:</span>
+                    <span className="text-[#777B73] font-medium">Reconciliation Variance:</span>
                     <span
                       className={`font-mono font-bold ${
                         verData.can_proceed_standard_lending
@@ -681,6 +776,16 @@ export default function VerificationPage() {
                 <p className="text-xs text-[#777B73]">
                   {verData.verifier_notes}
                 </p>
+                {verData.can_proceed_standard_lending && (
+                  <div className="pt-1 flex justify-end">
+                    <Link
+                      href="/credit-assessment"
+                      className="text-[11px] font-bold text-[#183B32] hover:underline flex items-center gap-1"
+                    >
+                      View AI Assessment Risk Discount <ChevronRight className="h-3 w-3" />
+                    </Link>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="p-8 text-center border border-dashed border-[#E5E1D7] rounded-xl text-xs text-[#777B73] space-y-2">
