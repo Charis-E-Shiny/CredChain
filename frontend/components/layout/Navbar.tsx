@@ -16,10 +16,11 @@ import {
 } from "lucide-react";
 import { chainConfig } from "@/config/contracts";
 
-// Borrower nav — "Reputation" and "Credit Passport" removed from top bar as requested
+// Borrower nav
 const borrowerNav = [
   { name: "Overview",       href: "/borrower",          icon: LayoutDashboard },
   { name: "AI Assessment",  href: "/credit-assessment", icon: BrainCircuit },
+  { name: "Verification",   href: "/verification",      icon: ShieldCheck },
   { name: "Apply for Loan", href: "/apply-loan",        icon: FilePlus2 },
   { name: "My Loans",       href: "/borrower/loans",    icon: Layers },
   { name: "Repayments",     href: "/repayment",         icon: Receipt },
@@ -34,13 +35,14 @@ const lenderNav = [
 ];
 
 const adminNav = [
-  { name: "Overview",       href: "/admin",           icon: LayoutDashboard },
-  { name: "Approvals",      href: "/admin/approvals", icon: FileCheck2 },
-  { name: "Governance",     href: "/governance",      icon: Vote },
-  { name: "Oracle",         href: "/admin/oracle",    icon: TrendingUp },
-  { name: "Roles",          href: "/admin/roles",     icon: Users },
-  { name: "Controls",       href: "/admin/controls",  icon: SlidersHorizontal },
-  { name: "Explorer",       href: "/explorer",        icon: Compass },
+  { name: "Overview",       href: "/admin",              icon: LayoutDashboard },
+  { name: "Approvals",      href: "/admin/approvals",    icon: FileCheck2 },
+  { name: "Verification",   href: "/admin/verification", icon: ShieldCheck },
+  { name: "Governance",     href: "/governance",         icon: Vote },
+  { name: "Oracle",         href: "/admin/oracle",       icon: TrendingUp },
+  { name: "Roles",          href: "/admin/roles",        icon: Users },
+  { name: "Controls",       href: "/admin/controls",     icon: SlidersHorizontal },
+  { name: "Explorer",       href: "/explorer",           icon: Compass },
 ];
 
 const ROLE_LABELS: Record<UserRole, string> = {

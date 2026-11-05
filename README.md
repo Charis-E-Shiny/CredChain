@@ -9,7 +9,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-14%20App%20Router-black?logo=next.js&logoColor=white)](https://nextjs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-Python%203.12-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Scikit-Learn](https://img.shields.io/badge/Scikit--Learn-GradientBoosting-F7931E?logo=scikit-learn&logoColor=white)](https://scikit-learn.org/)
-[![Tests](https://img.shields.io/badge/Tests-111%20Forge%20%7C%207%20Pytest-brightgreen)](https://github.com/RachanaB5/CredChain)
+[![Tests](https://img.shields.io/badge/Tests-132%20Forge%20%7C%2016%20Pytest-brightgreen)](https://github.com/RachanaB5/CredChain)
 
 **Trust. Verify. Borrow. Repay.**
 
@@ -136,6 +136,53 @@ stateDiagram-v2
   $$\text{Reputation Score} = \frac{\text{Repaid Loans} \times 100}{\text{Total Loans}}$$
   *(First-time borrowers start with a neutral baseline of 50)*.
 
+### Module 5: Borrower Financial Verification Layer (`VerificationRegistry.sol`)
+- **Core Concept**: Cryptographic anchor for off-chain OCR document reconciliation without storing sensitive private documents on-chain.
+- **Four Reliability Tiers**:
+  1. `UNVERIFIED`: Self-declared by borrower without supporting documents.
+  2. `EVIDENCE_CHECKED`: PDF/scanned documents parsed via PyMuPDF/Tesseract OCR and reconciled against declarations within $\pm 5\%$ tolerance.
+  3. `SOURCE_VERIFIED`: Confirmed by an authorized institutional verifier or trusted API.
+  4. `MANUAL_REVIEW`: Divergence exceeds $5\%$ or automated extraction requires human officer review.
+- **Privacy Preservation**: Raw documents remain in secure off-chain storage. Only a deterministic `bytes32` SHA-256 canonical hash is stored in `VerificationRegistry.sol`.
+
+---
+
+## 🛡️ Borrower Financial Verification Layer
+
+CredChain distinguishes between self-declared financial data, automated evidence-checked documents, and institutional source verification:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     BORROWER FINANCIAL VERIFICATION                         │
+│                                                                             │
+│   Declared Income ($) ──┐                                                   │
+│                         ▼                                                   │
+│   Uploaded Document ──► PyMuPDF / Tesseract OCR ──► Extracted Salary Avg.   │
+│   (PDF / JPG / PNG)             │                                           │
+│                                 ▼                                           │
+│               Discrepancy Analysis (Tolerance: ±5%)                         │
+│                                 │                                           │
+│              ┌──────────────────┴──────────────────┐                        │
+│              ▼                                     ▼                        │
+│       Within Tolerance                   Exceeds Tolerance / Error          │
+│              │                                     │                        │
+│              ▼                                     ▼                        │
+│       EVIDENCE_CHECKED                       MANUAL_REVIEW                  │
+│   (Eligible for Standard Lending)     (Queued for Verifier Review)          │
+│              │                                     │                        │
+│              └──────────────────┬──────────────────┘                        │
+│                                 ▼                                           │
+│               Admin / Verifier Attestation ──► SOURCE_VERIFIED              │
+│                                 │                                           │
+│                                 ▼                                           │
+│               VerificationRegistry.sol (On-Chain Hash)                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+- **Document Processing**: Extracts net pay, monthly salary credit averages, and currency notations from PDFs and image scans using PyMuPDF and Tesseract OCR.
+- **Rule-Based Tolerance**: Automatically computes variance percentage against declared income. Flags for `MANUAL_REVIEW` if divergence $>5\%$.
+- **On-Chain Attestation**: `VerificationRegistry.sol` restricts status transitions to `VERIFIER_ROLE` and logs immutable audit events.
+
 ---
 
 ## 🧠 Machine Learning Credit Scoring Engine
@@ -158,13 +205,17 @@ Built with **Next.js 14 App Router**, **TypeScript**, **Tailwind CSS**, and **Wa
 
 | Page | Route | Description |
 |---|---|---|
-| **Landing** | `/` | Platform introduction, architecture summary, and 1-click test token faucet. |
-| **Dashboard** | `/dashboard` | Real-time wallet telemetry, CRED balance, active loans, reputation, and Chainlink ETH/USD feed. |
+| **Landing** | `/` | Platform introduction, 3D animated pitch deck, and 1-click test token faucet. |
+| **Borrower Dashboard** | `/borrower` | Real-time wallet telemetry, CRED balance, active loans, upcoming repayments, and reputation. |
+| **Lender Dashboard** | `/lender` | Capital deployed, active investments, interest earned, and marketplace link. |
+| **Financial Verification** | `/verification` | Borrower evidence upload (PDF/JPG), automated OCR extraction, discrepancy analysis, and on-chain record hash. |
+| **Admin Verification Queue**| `/admin/verification` | Verifier review dashboard for reviewing flagged discrepancies and authorizing SOURCE_VERIFIED status. |
 | **Credit Assessment** | `/credit-assessment` | Consented financial application form with live FastAPI risk evaluation and SHAP factors. |
-| **Apply for Loan** | `/apply-loan` | Form to deposit collateral into `LoanEscrow` and submit a loan request on-chain. |
+| **Apply for Loan** | `/apply-loan` | Form to deposit collateral into `LoanEscrow` and submit a loan request on-chain with verification badge. |
+| **Credit Passport** | `/credit-passport` | Verifiable credit passport with on-chain reputation, verification status, and downloadable PDF with QR code. |
 | **Marketplace** | `/marketplace` | Peer-to-peer liquidity provider dashboard for lenders to inspect and fund approved loans. |
 | **Repayments** | `/repayment` | 2-step portal to approve CRED and repay loans, automatically unlocking collateral. |
-| **Reputation** | `/reputation` | Transparent on-chain borrower score, completion rates, and historical activity breakdown. |
+| **Reputation** | `/reputation` | Transparent on-chain borrower score, completion rates, and financial verification status. |
 | **Governance** | `/governance` | Multi-sig review portal for addresses holding `APPROVER_ROLE` to approve or reject loans. |
 | **Explorer** | `/explorer` | Verified contract addresses on Sepolia / Anvil with 1-click copy and block explorer links. |
 | **Admin Console** | `/admin` | Protocol circuit breakers (`pause` / `unpause`) and Chainlink oracle health monitor. |
@@ -174,20 +225,36 @@ Built with **Next.js 14 App Router**, **TypeScript**, **Tailwind CSS**, and **Wa
 ## 🧪 Testing & Security Validation
 
 ```bash
-Ran 7 test suites in 121.98ms: 111 tests passed, 0 failed, 0 skipped
+Ran 9 test suites in 133.22ms: 132 tests passed, 0 failed, 0 skipped
 ======================================================================
-  - LoanManagerTest:        43 passed (Unit, Fuzz, Invariants)
-  - CredTokenTest:          36 passed (Cap checks, Faucet, Pauses)
-  - LoanEscrowTest:         10 passed (Custody, Atomic release, Seizures)
-  - LoanGovernanceTest:      5 passed (Multi-sig thresholds, Rejections)
-  - CollateralOracleTest:    8 passed (Price validity, Staleness checks)
-  - BorrowerReputationTest:  7 passed (Score math, Default penalties)
-  - IntegrationTest:         2 passed (Full happy path & default workflow)
+  - LoanManagerTest:             43 passed (Unit, Fuzz, Invariants)
+  - CredTokenTest:               36 passed (Cap checks, Faucet, Pauses)
+  - CreditPassportRegistryTest:  13 passed (Issuance, Verification, Revocation)
+  - LoanEscrowTest:              10 passed (Custody, Atomic release, Seizures)
+  - VerificationRegistryTest:     8 passed (Attestation, Discrepancies, Pauses)
+  - CollateralOracleTest:         8 passed (Price validity, Staleness checks)
+  - BorrowerReputationTest:       7 passed (Score math, Default penalties)
+  - LoanGovernanceTest:           5 passed (Multi-sig thresholds, Rejections)
+  - IntegrationTest:              2 passed (Full happy path & default workflow)
 
-Backend Pytest Suite: 7 passed in 1.89s
+Backend Pytest Suite: 16 passed in 3.72s
 ======================================================================
-  - Health check, Valid assessment, Consent enforcement, Input bounds,
-    Credit history, Analytics overview, Borrower profile.
+  - test_health_endpoint: PASSED
+  - test_assess_valid_low_risk: PASSED
+  - test_assess_consent_required: PASSED
+  - test_assess_invalid_input: PASSED
+  - test_credit_history_endpoint: PASSED
+  - test_analytics_overview: PASSED
+  - test_borrower_profile: PASSED
+  - test_canonical_json_and_hashing_consistency: PASSED
+  - test_generate_passport_missing_consent: PASSED
+  - test_generate_passport_invalid_wallet: PASSED
+  - test_passport_lifecycle: PASSED
+  - test_verification_status_default_unverified: PASSED
+  - test_verification_process_evidence_checked: PASSED
+  - test_verification_process_discrepancy_flags_manual_review: PASSED
+  - test_admin_review_can_assign_source_verified: PASSED
+  - test_credit_assessment_integration_returns_verification_attributes: PASSED
 ```
 
 ---

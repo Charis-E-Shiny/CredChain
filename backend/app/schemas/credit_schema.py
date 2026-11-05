@@ -66,6 +66,7 @@ class CreditAssessmentResponse(BaseModel):
     """Output schema returned after a credit risk assessment."""
 
     risk_score: float = Field(..., ge=0, le=1, description="Predicted default probability (0-1)")
+    predicted_default_probability: float = Field(default=0.0, ge=0, le=1, description="Alias for risk_score")
     risk_category: RiskCategory
     confidence: float = Field(..., ge=0, le=1, description="Model confidence in the prediction")
     contributing_factors: List[FeatureImportance] = Field(default_factory=list)
@@ -74,6 +75,13 @@ class CreditAssessmentResponse(BaseModel):
     assessment_id: str
     timestamp: str
     disclaimer: str = "Educational prototype only. Not for real financial decisions."
+
+    # Verification Layer attributes
+    verification_status: str = Field(default="UNVERIFIED", description="UNVERIFIED / EVIDENCE_CHECKED / SOURCE_VERIFIED / MANUAL_REVIEW")
+    declared_income: float = Field(default=0.0, description="Declared annual income")
+    extracted_income: Optional[float] = Field(default=None, description="Extracted annual income from evidence")
+    income_discrepancy_percentage: Optional[float] = Field(default=None, description="Percentage discrepancy between declared and extracted")
+    requires_manual_review: bool = Field(default=False, description="Flag indicating human review requirement")
 
     model_config = {"from_attributes": True}
 

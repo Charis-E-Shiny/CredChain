@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
-from app.database.models import CreditAssessment, UserProfile
+from app.database.models import BorrowerVerification, CreditAssessment, UserProfile
 from app.schemas.credit_schema import (
     CreditAssessmentRequest,
     CreditAssessmentResponse,
@@ -116,11 +116,47 @@ def assess_credit(
         )
         db.add(profile)
 
+    # Sync with BorrowerVerification record
+    clean_wallet = request.wallet_address.lower().strip()
+    bv: Optional[BorrowerVerification] = (
+        db.query(BorrowerVerification)
+        .filter(BorrowerVerification.wallet_address == clean_wallet)
+        .first()
+    )
+
+    if not bv:
+        # Pre-seed verification record with declared values as UNVERIFIED
+        bv = BorrowerVerification(
+            wallet_address=clean_wallet,
+            declared_annual_income=request.annual_income,
+            declared_monthly_income=round(request.annual_income / 12.0, 2),
+            declared_monthly_debt=request.monthly_debt,
+            declared_employment_years=request.employment_length_years,
+            extracted_monthly_income=0.0,
+            discrepancy_percentage=0.0,
+            status="UNVERIFIED",
+            verifier_notes="Initial self-declared financial profile registered.",
+        )
+        db.add(bv)
+    else:
+        # Update declared income if borrower has updated assessment values
+        bv.declared_annual_income = request.annual_income
+        bv.declared_monthly_income = round(request.annual_income / 12.0, 2)
+        bv.declared_monthly_debt = request.monthly_debt
+        bv.declared_employment_years = request.employment_length_years
+
     db.commit()
     db.refresh(assessment)
 
+    verif_status = bv.status
+    declared_inc = bv.declared_annual_income
+    extracted_inc = bv.extracted_monthly_income * 12.0 if (bv.extracted_monthly_income and bv.extracted_monthly_income > 0) else None
+    disc_pct = bv.discrepancy_percentage if (bv.extracted_monthly_income and bv.extracted_monthly_income > 0) else None
+    req_manual = (verif_status == "MANUAL_REVIEW")
+
     return CreditAssessmentResponse(
         risk_score=float(risk_score),
+        predicted_default_probability=float(risk_score),
         risk_category=risk_category,
         confidence=float(confidence),
         contributing_factors=factors,
@@ -128,6 +164,11 @@ def assess_credit(
         model_version=model_ver,
         assessment_id=str(assessment.id),
         timestamp=now_iso,
+        verification_status=verif_status,
+        declared_income=declared_inc,
+        extracted_income=extracted_inc,
+        income_discrepancy_percentage=disc_pct,
+        requires_manual_review=req_manual,
     )
 
 

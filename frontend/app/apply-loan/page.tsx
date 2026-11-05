@@ -36,12 +36,13 @@ export default function ApplyLoanPage() {
 
   const [recentAssessment, setRecentAssessment] = useState<PastAssessment | null>(null);
   const [loadingAssessment, setLoadingAssessment] = useState(false);
+  const [verificationStatus, setVerificationStatus] = useState<string | null>(null);
 
   const [txHash, setTxHash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<"form" | "approving" | "requesting" | "done">("form");
 
-  // Fetch real assessment for connected wallet
+  // Fetch real assessment and verification status for connected wallet
   useEffect(() => {
     if (!address) return;
     setLoadingAssessment(true);
@@ -56,6 +57,15 @@ export default function ApplyLoanPage() {
       })
       .catch((e) => console.error("Error loading assessment:", e))
       .finally(() => setLoadingAssessment(false));
+
+    fetch(`${chainConfig.apiUrl}/api/verification/status/${address}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && data.status) {
+          setVerificationStatus(data.status);
+        }
+      })
+      .catch((e) => console.error("Error loading verification status:", e));
   }, [address]);
 
   // Suggested collateral based on loan amount (20% minimum baseline or 150% LTV)
@@ -162,6 +172,47 @@ export default function ApplyLoanPage() {
             </Link>
           </div>
         )}
+      </div>
+
+      {/* Financial Verification Status Card */}
+      <div className="p-4 rounded-2xl border bg-card/60 backdrop-blur shadow-sm space-y-2">
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+            <ShieldCheck className="h-4 w-4 text-[#183B32]" />
+            Financial Reliability Verification
+          </span>
+          {verificationStatus === "SOURCE_VERIFIED" && (
+            <span className="px-2 py-0.5 rounded bg-[#34765A]/15 border border-[#34765A]/30 text-[#34765A] font-mono text-[11px] font-bold">
+              SOURCE VERIFIED
+            </span>
+          )}
+          {verificationStatus === "EVIDENCE_CHECKED" && (
+            <span className="px-2 py-0.5 rounded bg-[#315B4C]/15 border border-[#315B4C]/30 text-[#315B4C] font-mono text-[11px] font-bold">
+              EVIDENCE CHECKED
+            </span>
+          )}
+          {verificationStatus === "MANUAL_REVIEW" && (
+            <span className="px-2 py-0.5 rounded bg-[#B94B45]/15 border border-[#B94B45]/30 text-[#B94B45] font-mono text-[11px] font-bold">
+              MANUAL REVIEW
+            </span>
+          )}
+          {(!verificationStatus || verificationStatus === "UNVERIFIED") && (
+            <span className="px-2 py-0.5 rounded bg-[#B77B26]/15 border border-[#B77B26]/30 text-[#B77B26] font-mono text-[11px] font-bold">
+              UNVERIFIED
+            </span>
+          )}
+        </div>
+
+        <div className="text-xs text-muted-foreground flex items-center justify-between gap-2 pt-1">
+          {verificationStatus === "SOURCE_VERIFIED" || verificationStatus === "EVIDENCE_CHECKED" ? (
+            <span>Document evidence reconciled on-chain. Eligible for expedited governance approval.</span>
+          ) : (
+            <span>Unverified declarations may require higher collateral or lender review.</span>
+          )}
+          <Link href="/verification" className="text-primary font-semibold hover:underline shrink-0">
+            {verificationStatus === "SOURCE_VERIFIED" || verificationStatus === "EVIDENCE_CHECKED" ? "View Evidence →" : "Verify Income →"}
+          </Link>
+        </div>
       </div>
 
       {/* Oracle Collateral Reference */}

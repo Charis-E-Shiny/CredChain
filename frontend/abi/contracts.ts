@@ -5139,3 +5139,88 @@ export const CreditPassportRegistryABI = [
     "inputs": []
   }
 ] as const;
+
+export const VerificationRegistryABI = [
+  {
+    "type": "function",
+    "name": "updateVerification",
+    "inputs": [
+      { "name": "borrower", "type": "address", "internalType": "address" },
+      { "name": "status", "type": "uint8", "internalType": "enum IVerificationRegistry.VerificationStatus" },
+      { "name": "recordHash", "type": "bytes32", "internalType": "bytes32" },
+      { "name": "declaredIncome", "type": "uint256", "internalType": "uint256" },
+      { "name": "extractedIncome", "type": "uint256", "internalType": "uint256" },
+      { "name": "discrepancyBps", "type": "uint16", "internalType": "uint16" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getVerification",
+    "inputs": [
+      { "name": "borrower", "type": "address", "internalType": "address" }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct IVerificationRegistry.VerificationRecord",
+        "components": [
+          { "name": "status", "type": "uint8", "internalType": "enum IVerificationRegistry.VerificationStatus" },
+          { "name": "recordHash", "type": "bytes32", "internalType": "bytes32" },
+          { "name": "verifier", "type": "address", "internalType": "address" },
+          { "name": "timestamp", "type": "uint256", "internalType": "uint256" },
+          { "name": "declaredIncome", "type": "uint256", "internalType": "uint256" },
+          { "name": "extractedIncome", "type": "uint256", "internalType": "uint256" },
+          { "name": "discrepancyBps", "type": "uint16", "internalType": "uint16" }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getVerificationStatus",
+    "inputs": [
+      { "name": "borrower", "type": "address", "internalType": "address" }
+    ],
+    "outputs": [
+      { "name": "", "type": "uint8", "internalType": "enum IVerificationRegistry.VerificationStatus" }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "isEvidenceCheckedOrBetter",
+    "inputs": [
+      { "name": "borrower", "type": "address", "internalType": "address" }
+    ],
+    "outputs": [
+      { "name": "", "type": "bool", "internalType": "bool" }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "VERIFIER_ROLE",
+    "inputs": [],
+    "outputs": [
+      { "name": "", "type": "bytes32", "internalType": "bytes32" }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "event",
+    "name": "VerificationStatusUpdated",
+    "inputs": [
+      { "name": "borrower", "type": "address", "indexed": true, "internalType": "address" },
+      { "name": "status", "type": "uint8", "indexed": true, "internalType": "enum IVerificationRegistry.VerificationStatus" },
+      { "name": "recordHash", "type": "bytes32", "indexed": true, "internalType": "bytes32" },
+      { "name": "verifier", "type": "address", "indexed": false, "internalType": "address" },
+      { "name": "timestamp", "type": "uint256", "indexed": false, "internalType": "uint256" },
+      { "name": "discrepancyBps", "type": "uint16", "indexed": false, "internalType": "uint16" }
+    ],
+    "anonymous": false
+  }
+] as const;

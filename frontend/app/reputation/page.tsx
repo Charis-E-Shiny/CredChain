@@ -1,12 +1,33 @@
 "use client";
 
+import { useState, useEffect } from "react";
+import { useAccount } from "wagmi";
 import { useCredChain } from "@/hooks/useCredChain";
-import { Award, CheckCircle2, XCircle, TrendingUp, ShieldCheck, ArrowRight, Info } from "lucide-react";
+import { chainConfig } from "@/config/contracts";
+import { Award, CheckCircle2, XCircle, TrendingUp, ShieldCheck, ArrowRight, Info, FileCheck2, AlertTriangle, Clock } from "lucide-react";
 import { formatTokenAmount } from "@/lib/utils";
 import Link from "next/link";
 
 export default function ReputationPage() {
   const { address, isConnected, reputationScore, reputationRecord } = useCredChain();
+
+  const [verificationStatus, setVerificationStatus] = useState<string>("UNVERIFIED");
+  const [verRecordHash, setVerRecordHash] = useState<string | null>(null);
+  const [verLendingRoute, setVerLendingRoute] = useState<string>("UNVERIFIED_RESTRICTED");
+
+  useEffect(() => {
+    if (!address) return;
+    fetch(`${chainConfig.apiUrl}/api/verification/status/${address}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) {
+          setVerificationStatus(data.status || "UNVERIFIED");
+          setVerRecordHash(data.record_hash || null);
+          setVerLendingRoute(data.lending_route || "UNVERIFIED_RESTRICTED");
+        }
+      })
+      .catch(() => {});
+  }, [address]);
 
   const rec = reputationRecord as any;
   const totalLoans = rec ? Number(rec.totalLoans ?? rec[0] ?? 0) : 0;
@@ -81,6 +102,46 @@ export default function ReputationPage() {
           View Credit Passport
           <ArrowRight className="h-3.5 w-3.5" />
         </Link>
+      </div>
+
+      {/* Financial Verification Status Section */}
+      <div className="p-5 rounded-2xl border bg-card/60 backdrop-blur shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4" />
+            Financial Verification Status
+          </h2>
+          <div className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+            verificationStatus === "SOURCE_VERIFIED" ? "bg-[#34765A]/15 border border-[#34765A]/30 text-[#34765A]" :
+            verificationStatus === "EVIDENCE_CHECKED" ? "bg-[#315B4C]/15 border border-[#315B4C]/30 text-[#315B4C]" :
+            verificationStatus === "MANUAL_REVIEW" ? "bg-[#B94B45]/15 border border-[#B94B45]/30 text-[#B94B45]" :
+            "bg-[#B77B26]/15 border border-[#B77B26]/30 text-[#B77B26]"
+          }`}>
+            {verificationStatus.replace("_", " ")}
+          </div>
+        </div>
+
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          {verificationStatus === "UNVERIFIED" && "Self-declared financial information with no supporting evidence. Upload documents via Financial Verification to progress."}
+          {verificationStatus === "EVIDENCE_CHECKED" && "Declared income reconciled against uploaded documents within ±5% tolerance. Document issuer not independently authenticated."}
+          {verificationStatus === "SOURCE_VERIFIED" && "Financial information independently confirmed by an authorized institutional verifier."}
+          {verificationStatus === "MANUAL_REVIEW" && "Document extraction revealed discrepancies exceeding tolerance threshold. Pending credit officer review."}
+        </p>
+
+        {verRecordHash && (
+          <div className="p-3 rounded-lg border bg-muted/20 text-xs font-mono break-all text-muted-foreground">
+            <span className="text-[10px] font-sans uppercase tracking-wider block mb-0.5 text-muted-foreground">Record Hash</span>
+            <span className="text-foreground text-[11px]">{verRecordHash}</span>
+          </div>
+        )}
+
+        <div className="flex items-center gap-3 text-xs">
+          <Link href="/verification" className="text-primary font-semibold hover:underline flex items-center gap-1">
+            Manage Verification <ArrowRight className="h-3 w-3" />
+          </Link>
+          <span className="text-muted-foreground">•</span>
+          <span className="text-muted-foreground">{verLendingRoute.replace(/_/g, " ")}</span>
+        </div>
       </div>
 
       {/* Deterministic Scoring Explanation */}

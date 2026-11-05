@@ -54,6 +54,7 @@ class PassportResponse(BaseModel):
     download_url: str
     verify_url: str
     status: str  # VALID / REVOKED / EXPIRED / INVALID
+    financial_verification_status: Optional[str] = "UNVERIFIED"
 
 
 class PassportVerificationResponse(BaseModel):
@@ -73,6 +74,7 @@ class PassportVerificationResponse(BaseModel):
     total_loans: Optional[int] = None
     repaid_loans: Optional[int] = None
     risk_category: Optional[str] = None
+    financial_verification_status: Optional[str] = "UNVERIFIED"
     registry_address: str
     blockchain_network: str
     verification_timestamp: str

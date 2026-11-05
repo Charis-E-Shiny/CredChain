@@ -9,6 +9,7 @@ import "../src/LoanGovernance.sol";
 import "../src/CollateralOracle.sol";
 import "../src/BorrowerReputation.sol";
 import "../src/CreditPassportRegistry.sol";
+import "../src/VerificationRegistry.sol";
 
 /**
  * @title Deploy
@@ -75,6 +76,10 @@ contract Deploy is Script {
         CreditPassportRegistry passportRegistry = new CreditPassportRegistry(deployer);
         console.log("CreditPassportRegistry deployed at:", address(passportRegistry));
 
+        // 8. Deploy VerificationRegistry
+        VerificationRegistry verificationRegistry = new VerificationRegistry(deployer);
+        console.log("VerificationRegistry deployed at:", address(verificationRegistry));
+
         // === Configure Cross-Contract References ===
 
         // LoanManager needs escrow, governance, reputation
@@ -105,6 +110,7 @@ contract Deploy is Script {
         console.log("CollateralOracle:", address(oracle));
         console.log("BorrowerReputation:", address(reputation));
         console.log("CreditPassportRegistry:", address(passportRegistry));
+        console.log("VerificationRegistry:", address(verificationRegistry));
     }
 }
 

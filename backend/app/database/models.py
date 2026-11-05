@@ -81,3 +81,61 @@ class CreditPassport(Base):
     canonical_data_json = Column(Text, nullable=False)
     pdf_path = Column(String, nullable=True)
 
+
+class VerificationDocument(Base):
+    """Stores metadata of uploaded borrower verification evidence (stored securely off-chain)."""
+
+    __tablename__ = "verification_documents"
+
+    id = Column(String, primary_key=True, default=_generate_uuid)
+    wallet_address = Column(String, index=True, nullable=False)
+    file_name = Column(String, nullable=False)
+    stored_path = Column(String, nullable=False)
+    file_type = Column(String, nullable=False)  # pdf, png, jpg, jpeg
+    file_size_bytes = Column(Integer, nullable=False)
+    document_type = Column(String, default="salary_slip")  # salary_slip, bank_statement, employment_letter, tax_return, other
+    upload_timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    extracted_text = Column(Text, nullable=True)
+    extracted_income = Column(Float, nullable=True)
+    extracted_metadata_json = Column(Text, nullable=True)
+    extraction_confidence = Column(Float, default=0.0)
+    status = Column(String, default="UNVERIFIED")  # UNVERIFIED / EVIDENCE_CHECKED / SOURCE_VERIFIED / MANUAL_REVIEW
+
+
+class BorrowerVerification(Base):
+    """Main verification summary per borrower wallet."""
+
+    __tablename__ = "borrower_verifications"
+
+    id = Column(String, primary_key=True, default=_generate_uuid)
+    wallet_address = Column(String, unique=True, index=True, nullable=False)
+    declared_annual_income = Column(Float, default=0.0)
+    declared_monthly_income = Column(Float, default=0.0)
+    declared_monthly_debt = Column(Float, default=0.0)
+    declared_employment_years = Column(Float, default=0.0)
+    extracted_monthly_income = Column(Float, default=0.0)
+    discrepancy_percentage = Column(Float, default=0.0)
+    status = Column(String, default="UNVERIFIED")  # UNVERIFIED / EVIDENCE_CHECKED / SOURCE_VERIFIED / MANUAL_REVIEW
+    record_hash = Column(String, nullable=True)  # Keccak256 / SHA256 of canonical report
+    verifier_notes = Column(Text, nullable=True)
+    verifier_address = Column(String, nullable=True)
+    source_verifier_name = Column(String, nullable=True)
+    on_chain_tx_hash = Column(String, nullable=True)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+class VerificationHistory(Base):
+    """Audit log of status changes and attestation events."""
+
+    __tablename__ = "verification_history"
+
+    id = Column(String, primary_key=True, default=_generate_uuid)
+    wallet_address = Column(String, index=True, nullable=False)
+    previous_status = Column(String, nullable=False)
+    new_status = Column(String, nullable=False)
+    changed_by = Column(String, nullable=False)  # system / verifier_address / admin
+    reason = Column(Text, nullable=True)
+    record_hash = Column(String, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+

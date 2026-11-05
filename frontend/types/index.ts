@@ -71,3 +71,66 @@ export interface AnalyticsOverview {
   risk_distribution: Record<string, number>;
   total_loans_tracked: number;
 }
+
+export type VerificationStatusType = "UNVERIFIED" | "EVIDENCE_CHECKED" | "SOURCE_VERIFIED" | "MANUAL_REVIEW";
+
+export interface VerificationDocumentItem {
+  id: string;
+  file_name: string;
+  file_type: string;
+  file_size_bytes: number;
+  document_type: string;
+  upload_timestamp: string;
+  status: string;
+  extracted_income: number | null;
+  extraction_confidence: number | null;
+}
+
+export interface VerificationStatusResponse {
+  wallet_address: string;
+  status: VerificationStatusType;
+  declared_annual_income: number;
+  declared_monthly_income: number;
+  declared_monthly_debt: number;
+  declared_employment_years: number;
+  extracted_monthly_income: number;
+  discrepancy_percentage: number;
+  tolerance_percentage: number;
+  record_hash: string | null;
+  verifier_notes: string | null;
+  verifier_address: string | null;
+  source_verifier_name: string | null;
+  on_chain_tx_hash: string | null;
+  documents: VerificationDocumentItem[];
+  updated_at: string;
+  can_proceed_standard_lending: boolean;
+  lending_route: string;
+}
+
+export interface DiscrepancyReport {
+  declared_annual_income: number;
+  declared_monthly_income: number;
+  extracted_monthly_income: number;
+  discrepancy_percentage: number;
+  tolerance_percentage: number;
+  is_within_tolerance: boolean;
+  status: VerificationStatusType;
+  explanation: string;
+  detected_credits: number[];
+  requires_manual_review: boolean;
+  record_hash: string | null;
+}
+
+export interface AdminVerificationItem {
+  wallet_address: string;
+  status: VerificationStatusType;
+  declared_annual_income: number;
+  declared_monthly_income: number;
+  extracted_monthly_income: number;
+  discrepancy_percentage: number;
+  requires_manual_review: boolean;
+  documents_count: number;
+  record_hash: string | null;
+  updated_at: string;
+  verifier_notes: string | null;
+}

@@ -4,6 +4,7 @@ Provides endpoints for passport generation, independent on-chain verification,
 revocation, PDF download, and borrower history.
 """
 
+import json
 from datetime import datetime, timedelta, timezone
 from typing import List
 
@@ -11,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
-from app.database.models import CreditAssessment, CreditPassport, LoanRecord
+from app.database.models import BorrowerVerification, CreditAssessment, CreditPassport, LoanRecord
 from app.schemas.passport_schema import (
     PassportGenerateRequest,
     PassportResponse,
@@ -58,6 +59,7 @@ def _format_passport_response(passport: CreditPassport, base_url: str) -> Passpo
 
     import json
     canonical_dict = json.loads(passport.canonical_data_json) if passport.canonical_data_json else {}
+    fin_status = canonical_dict.get("financial_verification_status", "UNVERIFIED")
 
     return PassportResponse(
         passport_id=passport.passport_id,
@@ -81,6 +83,7 @@ def _format_passport_response(passport: CreditPassport, base_url: str) -> Passpo
         download_url=f"/api/passport/{passport.passport_id}/download",
         verify_url=f"{base_url}/verify/{passport.passport_id}",
         status=eff_status,
+        financial_verification_status=fin_status,
     )
 
 
@@ -121,12 +124,16 @@ def generate_passport(req: PassportGenerateRequest, db: Session = Depends(get_db
     passport_id = generate_passport_id()
 
     # 3. Deterministic Canonical Data Payload
+    bv = db.query(BorrowerVerification).filter(BorrowerVerification.wallet_address == wallet).first()
+    financial_verification_status = bv.status if bv else "UNVERIFIED"
+
     canonical_data = {
         "ai_confidence": round(confidence, 4),
         "ai_risk_category": risk_category,
         "borrower": wallet,
         "defaulted_loans": defaulted,
         "expires_at": int(expires_at.timestamp()),
+        "financial_verification_status": financial_verification_status,
         "issued_at": int(now_utc.timestamp()),
         "network": "Anvil Local (Chain ID 31337)",
         "on_time_repayment_rate": round(on_time_rate, 2),
@@ -264,6 +271,7 @@ def verify_passport(passport_id: str, db: Session = Depends(get_db)):
         total_loans=passport.total_loans,
         repaid_loans=passport.repaid_loans,
         risk_category=passport.risk_category,
+        financial_verification_status=json.loads(passport.canonical_data_json).get("financial_verification_status", "UNVERIFIED") if passport.canonical_data_json else "UNVERIFIED",
         registry_address=REGISTRY_ADDRESS,
         blockchain_network="Anvil Local (Chain ID: 31337)",
         verification_timestamp=now_iso,
@@ -327,6 +335,9 @@ def download_passport_pdf(passport_id: str, db: Session = Depends(get_db)):
     repaid = passport.repaid_loans
     rate = (repaid / total * 100.0) if total > 0 else 100.0
 
+    canonical_dict = json.loads(passport.canonical_data_json) if passport.canonical_data_json else {}
+    fin_status = canonical_dict.get("financial_verification_status", "UNVERIFIED")
+
     passport_dict = {
         "passport_id": passport.passport_id,
         "wallet_address": passport.wallet_address,
@@ -339,6 +350,7 @@ def download_passport_pdf(passport_id: str, db: Session = Depends(get_db)):
         "on_time_repayment_rate": rate,
         "risk_category": passport.risk_category,
         "confidence": passport.confidence,
+        "financial_verification_status": fin_status,
         "data_hash": passport.data_hash,
         "issued_at": passport.issued_at.strftime("%Y-%m-%d %H:%M UTC") if passport.issued_at else "N/A",
         "expires_at": passport.expires_at.strftime("%Y-%m-%d %H:%M UTC") if passport.expires_at else "N/A",

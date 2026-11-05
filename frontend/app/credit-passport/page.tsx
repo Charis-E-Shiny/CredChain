@@ -60,6 +60,11 @@ export default function CreditPassportPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // Verification status for the passport display
+  const [verificationStatus, setVerificationStatus] = useState<string>("UNVERIFIED");
+  const [verRecordHash, setVerRecordHash] = useState<string | null>(null);
+  const [verLendingRoute, setVerLendingRoute] = useState<string>("UNVERIFIED_RESTRICTED");
+
   // Parse on-chain reputation record
   const rec = reputationRecord as any;
   const onChainTotalLoans = rec ? Number(rec.totalLoans ?? rec[0] ?? 0) : 0;
@@ -92,6 +97,17 @@ export default function CreditPassportPage() {
   useEffect(() => {
     if (address) {
       fetchPassports();
+      // Fetch verification status
+      fetch(`${chainConfig.apiUrl}/api/verification/status/${address}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data) {
+            setVerificationStatus(data.status || "UNVERIFIED");
+            setVerRecordHash(data.record_hash || null);
+            setVerLendingRoute(data.lending_route || "UNVERIFIED_RESTRICTED");
+          }
+        })
+        .catch(() => {});
     }
   }, [address]);
 
@@ -285,6 +301,36 @@ export default function CreditPassportPage() {
             <Lock className="h-3.5 w-3.5 text-muted-foreground" />
             <span>Preserves financial data privacy</span>
           </div>
+        </div>
+      </div>
+
+      {/* Card 4: Financial Verification Status */}
+      <div className="p-6 rounded-2xl border bg-card/60 backdrop-blur shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="text-xs uppercase font-bold tracking-wider text-muted-foreground">Financial Verification</div>
+          <ShieldCheck className="h-5 w-5 text-[#183B32]" />
+        </div>
+        <div className="flex items-center gap-3">
+          <div className={`px-3 py-1.5 rounded-lg font-bold font-mono text-sm ${
+            verificationStatus === "SOURCE_VERIFIED" ? "bg-[#34765A]/15 border border-[#34765A]/30 text-[#34765A]" :
+            verificationStatus === "EVIDENCE_CHECKED" ? "bg-[#315B4C]/15 border border-[#315B4C]/30 text-[#315B4C]" :
+            verificationStatus === "MANUAL_REVIEW" ? "bg-[#B94B45]/15 border border-[#B94B45]/30 text-[#B94B45]" :
+            "bg-[#B77B26]/15 border border-[#B77B26]/30 text-[#B77B26]"
+          }`}>
+            {verificationStatus.replace("_", " ")}
+          </div>
+          <span className="text-xs text-muted-foreground">{verLendingRoute.replace(/_/g, " ")}</span>
+        </div>
+        {verRecordHash && (
+          <div className="text-xs text-muted-foreground border-t pt-2">
+            <span className="text-[10px] text-muted-foreground block uppercase tracking-wider mb-0.5">Record Hash</span>
+            <span className="font-mono text-foreground text-[11px] break-all">{verRecordHash}</span>
+          </div>
+        )}
+        <div className="text-xs text-muted-foreground">
+          <Link href="/verification" className="text-primary font-semibold hover:underline">
+            View Verification Details →
+          </Link>
         </div>
       </div>
 

@@ -39,6 +39,10 @@ backend/app/ml/artifacts/*.joblib
 .DS_Store
 Thumbs.db
 
+# Uploads
+backend/app/uploads/
+*.tsbuildinfo
+
 # Keys - NEVER commit
 *.pem
 *.key

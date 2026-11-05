@@ -494,7 +494,51 @@ def generate_passport_pdf(passport_dict: Dict[str, Any], verify_url: str) -> byt
     story.append(ai_table)
     story.append(Spacer(1, 12))
 
-    # 5. Section 3: On-Chain Cryptographic Proof
+    # 5. Section 3: Financial Verification Reliability Layer
+    fin_status = passport_dict.get("financial_verification_status", "UNVERIFIED")
+    if fin_status == "SOURCE_VERIFIED":
+        fin_color = "#059669"
+        fin_desc = "Confirmed by authorized institutional attestation."
+    elif fin_status == "EVIDENCE_CHECKED":
+        fin_color = "#0284C7"
+        fin_desc = "Reconciled within 5% tolerance. Issuer not authenticated."
+    elif fin_status == "MANUAL_REVIEW":
+        fin_color = "#DC2626"
+        fin_desc = "Discrepancy detected; pending specialist evaluation."
+    else:
+        fin_color = "#D97706"
+        fin_desc = "Self-declared borrower figures without supporting evidence."
+
+    ver_data = [
+        [
+            Paragraph("<b>Verification Standing:</b>", body_text),
+            Paragraph(f"<b><font color='{fin_color}'>{fin_status}</font></b>", body_text),
+            Paragraph("<b>Reliability Assessment:</b>", body_text),
+            Paragraph(fin_desc, body_text),
+        ],
+        [
+            Paragraph("<b>Integrity Notice:</b>", body_text),
+            Paragraph(
+                "EVIDENCE_CHECKED confirms mathematical reconciliation within 5% tolerance but does NOT prove document authenticity. Only SOURCE_VERIFIED indicates third-party confirmation.",
+                ParagraphStyle("NoticeStyle", parent=body_text, fontSize=7.5, leading=10, textColor=colors.HexColor("#64748B")),
+            ),
+            Paragraph("<b>Registry Contract:</b>", body_text),
+            Paragraph("VerificationRegistry.sol", mono_style),
+        ]
+    ]
+    ver_table = Table(ver_data, colWidths=[110, 160, 110, 160])
+    ver_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
+        ("PADDING", (0, 0), (-1, -1), 5),
+        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+    story.append(Paragraph("<b>3. Financial Verification & Reliability Layer</b>", section_heading))
+    story.append(Spacer(1, 4))
+    story.append(ver_table)
+    story.append(Spacer(1, 12))
+
+    # 6. Section 4: On-Chain Cryptographic Proof
     data_hash = passport_dict.get("data_hash", "")
     tx_hash = passport_dict.get("tx_hash", "Registered via Anvil testnet")
     registry_addr = passport_dict.get("registry_address", REGISTRY_ADDRESS)
@@ -513,7 +557,7 @@ def generate_passport_pdf(passport_dict: Dict[str, Any], verify_url: str) -> byt
         ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
     ]))
-    story.append(Paragraph("<b>3. Blockchain Cryptographic Anchoring & Independent Audit</b>", section_heading))
+    story.append(Paragraph("<b>4. Blockchain Cryptographic Anchoring & Independent Audit</b>", section_heading))
     story.append(Spacer(1, 4))
     story.append(proof_table)
     story.append(Spacer(1, 14))
