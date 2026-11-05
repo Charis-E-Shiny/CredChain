@@ -21,6 +21,25 @@ stateDiagram-v2
     CANCELLED --> [*]
 ```
 
+### Transition Rules and Known Gaps
+
+| From | To | Caller | Guard |
+|------|----|--------|-------|
+| REQUESTED | APPROVED | Governance or OPERATOR | status == REQUESTED |
+| REQUESTED | REJECTED | Governance or OPERATOR | status == REQUESTED |
+| REQUESTED | CANCELLED | Borrower | status == REQUESTED |
+| APPROVED | ACTIVE | Any lender | `block.timestamp <= approvalTime + 7 days` |
+| ACTIVE | REPAID | Borrower | cumulative repayment >= principal + interest |
+| ACTIVE | DEFAULTED | Anyone | `block.timestamp > repaymentDeadline` |
+
+**Known gap:** No function moves an APPROVED loan whose approval has expired. `activateLoan` reverts with `ApprovalExpired`, and the loan stays in APPROVED. It also counts toward the borrower's `MAX_ACTIVE_LOANS_PER_BORROWER` cap, so five expired approvals block new requests. `cancelLoan` only works from REQUESTED. Tests characterizing this are in `test/LoanManagerInvariant.t.sol` (`test_KnownGap_*`).
+
+**Interest:** `_calculateTotalOwed` applies a flat rate, `principal * (10000 + bps) / 10000`, and ignores `duration`. Owed is the same for a 1-day loan and a 365-day loan at the same rate. Time-based simple interest is not implemented.
+
+Invariants checked by `LoanManagerInvariantTest` (stateful, handler-driven): legal transitions only, active-loan counter matches statuses, repaid never exceeds owed, REPAID implies fully repaid.
+
+---
+
 ### Emitted Events
 - `LoanRequested(uint256 indexed loanId, address indexed borrower, uint256 amount, uint256 collateral)`
 - `LoanApproved(uint256 indexed loanId, address indexed approver)`

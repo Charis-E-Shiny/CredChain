@@ -669,10 +669,11 @@ contract LoanManagerTest is Test {
     }
 
     // ============================
-    //  Invariant: total repaid never exceeds total owed
+    //  Partial repayments never push repaid past total owed
+    //  (stateful invariants live in LoanManagerInvariant.t.sol)
     // ============================
 
-    function test_Invariant_RepaidNeverExceedsTotalOwed() public {
+    function test_RepaidNeverExceedsTotalOwed_AcrossPartialPayments() public {
         uint256 loanId = _createActiveLoan();
 
         uint256 totalOwed = (LOAN_AMOUNT * (10000 + INTEREST_BPS)) / 10000;
