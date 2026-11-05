@@ -15,28 +15,38 @@ import {
   Briefcase, UserCheck
 } from "lucide-react";
 import { chainConfig } from "@/config/contracts";
+import { ANVIL_ACCOUNTS } from "@/lib/contractExecution";
 
-// Borrower nav — Unified financial underwriting & lending journey
+// Borrower nav — Complete borrower lifecycle & underwriting journey
 const borrowerNav = [
   { name: "Overview",       href: "/borrower",          icon: LayoutDashboard },
   { name: "AI Assessment & Verification", href: "/credit-assessment", icon: BrainCircuit },
   { name: "Apply for Loan", href: "/apply-loan",        icon: FilePlus2 },
   { name: "My Loans",       href: "/borrower/loans",    icon: Layers },
   { name: "Repayments",     href: "/repayment",         icon: Receipt },
+  { name: "Credit Passport", href: "/credit-passport",  icon: ShieldCheck },
+  { name: "My Reputation",  href: "/reputation",        icon: Award },
 ];
 
-// Lender nav — Streamlined capital deployment & portfolio monitoring
+// Lender nav — Capital deployment, marketplace & portfolio performance
 const lenderNav = [
-  { name: "Overview",       href: "/lender",             icon: LayoutDashboard },
-  { name: "Marketplace",    href: "/marketplace",        icon: Store },
-  { name: "My Investments", href: "/lender/investments", icon: Coins },
+  { name: "Overview",             href: "/lender",             icon: LayoutDashboard },
+  { name: "Loan Marketplace",     href: "/marketplace",        icon: Store },
+  { name: "My Investments",       href: "/lender/investments", icon: Coins },
+  { name: "Returns & Repayments", href: "/lender/returns",     icon: Receipt },
+  { name: "Blockchain Explorer",  href: "/explorer",           icon: Compass },
 ];
 
-// Admin nav — Essential risk, loan approval, and verification governance
+// Admin nav — Risk management, loan approval & protocol governance
 const adminNav = [
-  { name: "Overview",       href: "/admin",              icon: LayoutDashboard },
-  { name: "Loan Approvals", href: "/admin/approvals",    icon: FileCheck2 },
+  { name: "System Overview",       href: "/admin",              icon: LayoutDashboard },
+  { name: "Loan Approvals",        href: "/admin/approvals",    icon: FileCheck2 },
   { name: "Document Verification", href: "/admin/verification", icon: ShieldCheck },
+  { name: "Risk & Oracle",         href: "/admin/oracle",       icon: TrendingUp },
+  { name: "Protocol Governance",   href: "/governance",         icon: Vote },
+  { name: "Roles & Users",         href: "/admin/roles",        icon: Users },
+  { name: "Protocol Controls",     href: "/admin/controls",     icon: SlidersHorizontal },
+  { name: "Blockchain Explorer",   href: "/explorer",           icon: Compass },
 ];
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -99,13 +109,14 @@ export function Navbar() {
   }, []);
 
   const requestEthFaucet = async () => {
-    if (!address) return;
+    const targetAddress = address || (isDemoMode ? ANVIL_ACCOUNTS[role]?.address : undefined);
+    if (!targetAddress) return;
     setFaucetLoading(true);
     try {
       const res = await fetch(`${chainConfig.apiUrl}/api/borrowers/faucet/eth`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ wallet_address: address, amount_eth: 1000 }),
+        body: JSON.stringify({ wallet_address: targetAddress, amount_eth: 1000 }),
       });
       if (res.ok) {
         setFaucetSuccess(true);
@@ -130,11 +141,11 @@ export function Navbar() {
   const networkName = chain?.name || chainConfig.networkName;
   const chainId = chain?.id || chainConfig.chainId;
 
-  // On landing page ("/") and login/signup page ("/login"), NO navigation links are displayed in the top bar
-  const isLandingOrAuthPage = pathname === "/" || pathname === "/login";
+  // On auth page ("/login"), navigation links are hidden
+  const isAuthPage = pathname === "/login";
 
-  // Determine active navigation links based on role (only shown when logged in and NOT on landing/login page)
-  const activeNav = isLandingOrAuthPage
+  // Determine active navigation links based on role (shown when logged in and NOT on auth page)
+  const activeNav = isAuthPage
     ? []
     : isLoggedIn
     ? role === "lender"
@@ -165,11 +176,17 @@ export function Navbar() {
     ? address.slice(2, 4).toUpperCase()
     : "CC";
 
+  // Effective wallet address to display
+  const displayAddress = address
+    ? shortenAddress(address)
+    : isDemoMode
+    ? shortenAddress(ANVIL_ACCOUNTS[role]?.address || "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266")
+    : null;
+
   return (
     <header
-      className="sticky top-0 z-40 w-full border-b shadow-sm transition-all"
+      className="sticky top-0 z-40 w-full shadow-sm transition-all"
       style={{
-        borderColor: "#E5E1D7",
         backgroundColor: "rgba(255, 255, 255, 0.98)",
         backdropFilter: "blur(12px)",
       }}
@@ -194,289 +211,330 @@ export function Navbar() {
         </div>
       )}
 
-      {/* Main Top Bar */}
-      <div className="flex h-16 items-center justify-between px-4 lg:px-8 max-w-screen-2xl mx-auto gap-4">
-        {/* Left: Brand Logo */}
-        <div className="flex items-center gap-6 shrink-0">
-          <Link href={homeHref} className="flex items-center gap-2.5 group">
-            <div
-              className="h-9 w-9 rounded-xl flex items-center justify-center font-black text-sm shadow-sm transition-transform group-hover:scale-105"
-              style={{ backgroundColor: "#183B32", color: "#D6A85F" }}
-            >
-              CC
-            </div>
-            <span className="text-xl font-bold tracking-tight" style={{ color: "#183B32" }}>
-              CredChain
-            </span>
-          </Link>
-        </div>
-
-        {/* Center: Top Bar Navigation Elements (only when logged in & not on landing/login) */}
-        {!isLandingOrAuthPage && activeNav.length > 0 && (
-          <nav className="hidden md:flex items-center gap-1 overflow-x-auto py-1 scrollbar-none flex-1 justify-center max-w-3xl">
-            {activeNav.map((item) => {
-              const isActive = pathname === item.href || (pathname.startsWith(item.href + "/") && item.href !== "/borrower" && item.href !== "/lender" && item.href !== "/admin");
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all",
-                    isActive
-                      ? "font-semibold shadow-sm"
-                      : "hover:bg-[#F4F1E8]"
-                  )}
-                  style={
-                    isActive
-                      ? { backgroundColor: "#183B32", color: "#D6A85F" }
-                      : { color: "#777B73" }
-                  }
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <span>{item.name}</span>
-                </Link>
-              );
-            })}
-          </nav>
-        )}
-
-        {/* Right: Account / Actions */}
-        <div className="flex items-center gap-2.5 shrink-0 ml-auto">
-          {/* MetaMask Live Connection Pill / Connect Button */}
-          {isConnected ? (
-            <div
-              className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-xl border font-mono font-semibold"
-              style={{
-                borderColor: "rgba(52,118,90,0.3)",
-                backgroundColor: "rgba(52,118,90,0.08)",
-                color: "#34765A",
-              }}
-              title={`MetaMask Wallet Connected: ${address}`}
-            >
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>🦊 {shortenAddress(address || "")}</span>
-            </div>
-          ) : (
-            <button
-              onClick={handleConnectMetaMask}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border transition-all shadow-sm hover:scale-105"
-              style={{
-                borderColor: "rgba(214,168,95,0.5)",
-                backgroundColor: "rgba(214,168,95,0.15)",
-                color: "#8B6514",
-              }}
-              title="Connect your MetaMask wallet for interactive on-chain signing"
-            >
-              <Wallet className="h-3.5 w-3.5 text-[#D6A85F]" />
-              <span>Connect MetaMask</span>
-            </button>
-          )}
-
-          {/* Network badge (when real wallet connected) */}
-          {isConnected && (
-            <div
-              className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg border font-mono"
-              style={{ borderColor: "#E5E1D7", backgroundColor: "#F4F1E8" }}
-            >
-              <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ backgroundColor: "#34765A" }} />
-              <span className="font-medium text-[#252C29]">{networkName}</span>
-            </div>
-          )}
-
-          {/* CRED Token Balance (when real wallet connected) */}
-          {isConnected && (
-            <div
-              className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-mono"
-              style={{ borderColor: "#E5E1D7", backgroundColor: "#F4F1E8" }}
-            >
-              <Coins className="h-3 w-3" style={{ color: "#D6A85F" }} />
-              <span className="font-bold text-[#252C29]">{formatTokenAmount(credBalance)}</span>
-              <span className="text-[#777B73]">CRED</span>
-            </div>
-          )}
-
-          {/* Anvil ETH Faucet Button */}
-          {isConnected && chainId === 31337 && (
-            <button
-              onClick={requestEthFaucet}
-              disabled={faucetLoading}
-              className="hidden sm:flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border transition-colors"
-              style={{
-                borderColor: "rgba(52,118,90,0.3)",
-                backgroundColor: "rgba(52,118,90,0.08)",
-                color: "#34765A",
-              }}
-              title="Request 1,000 ETH test funds on Anvil"
-            >
-              <Fuel className="h-3 w-3" />
-              {faucetSuccess ? "Credited!" : faucetLoading ? "..." : "1,000 ETH"}
-            </button>
-          )}
-
-          {/* CRED Token Faucet Button (MetaMask) */}
-          {isConnected && (
-            <button
-              onClick={handleCredFaucet}
-              disabled={credFaucetLoading}
-              className="hidden md:flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border transition-colors hover:scale-105"
-              style={{
-                borderColor: "rgba(214,168,95,0.4)",
-                backgroundColor: "rgba(214,168,95,0.12)",
-                color: "#8B6514",
-              }}
-              title="Mint 1,000 CRED tokens via MetaMask"
-            >
-              <Coins className="h-3 w-3 text-[#D6A85F]" />
-              {credFaucetSuccess ? "Minted!" : credFaucetLoading ? "Signing..." : "+1,000 CRED"}
-            </button>
-          )}
-
-          {/* Logged in state -> User Menu */}
-          {isLoggedIn ? (
-            <div className="relative" ref={userMenuRef}>
-              <button
-                onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all shadow-sm hover:border-[#183B32]/30"
-                style={{
-                  borderColor: "#E5E1D7",
-                  backgroundColor: "#fff",
-                }}
-              >
-                <div
-                  className="h-7 w-7 rounded-lg flex items-center justify-center text-xs font-bold"
-                  style={{ backgroundColor: "#183B32", color: "#D6A85F" }}
-                >
-                  {avatarInitials}
-                </div>
-                <div className="text-left hidden sm:block">
-                  <div className="text-xs font-bold leading-tight" style={{ color: "#252C29" }}>
-                    {accountLabel}
-                  </div>
-                  <div className="text-[10px] leading-tight" style={{ color: "#777B73" }}>
-                    {isDemoMode ? `Demo · ${ROLE_LABELS[role]}` : ROLE_LABELS[role]}
-                  </div>
-                </div>
-                <ChevronDown className="h-3.5 w-3.5 text-[#777B73]" />
-              </button>
-
-              {/* User Dropdown — Switch Role has been completely removed */}
-              {userMenuOpen && (
-                <div
-                  className="absolute right-0 top-full mt-2 w-60 rounded-2xl border bg-white shadow-xl overflow-hidden z-50 p-1"
-                  style={{ borderColor: "#E5E1D7" }}
-                >
-                  <div className="p-3 border-b" style={{ borderColor: "#E5E1D7", backgroundColor: "#F4F1E8" }}>
-                    <div className="text-xs font-bold" style={{ color: "#252C29" }}>{accountLabel}</div>
-                    <div className="text-[11px] font-mono mt-0.5 text-[#777B73] truncate">
-                      {isDemoMode ? `Active Profile: ${ROLE_LABELS[role]}` : address}
-                    </div>
-                  </div>
-
-                  {/* Role-specific menu links */}
-                  <div className="p-1">
-                    {role === "borrower" && (
-                      <>
-                        <Link
-                          href="/credit-passport"
-                          onClick={() => setUserMenuOpen(false)}
-                          className="flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-[#F4F1E8] text-[#252C29] transition-colors"
-                        >
-                          <ShieldCheck className="h-4 w-4 text-[#183B32]" />
-                          <span>Credit Passport</span>
-                        </Link>
-                        <Link
-                          href="/reputation"
-                          onClick={() => setUserMenuOpen(false)}
-                          className="flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-[#F4F1E8] text-[#252C29] transition-colors"
-                        >
-                          <Award className="h-4 w-4 text-[#183B32]" />
-                          <span>My Reputation</span>
-                        </Link>
-                      </>
-                    )}
-
-                    {role === "lender" && (
-                      <Link
-                        href="/lender/investments"
-                        onClick={() => setUserMenuOpen(false)}
-                        className="flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-[#F4F1E8] text-[#252C29] transition-colors"
-                      >
-                        <Coins className="h-4 w-4 text-[#183B32]" />
-                        <span>My Investments</span>
-                      </Link>
-                    )}
-
-                    {role === "admin" && (
-                      <>
-                        <Link
-                          href="/admin/approvals"
-                          onClick={() => setUserMenuOpen(false)}
-                          className="flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-[#F4F1E8] text-[#252C29] transition-colors"
-                        >
-                          <FileCheck2 className="h-4 w-4 text-[#183B32]" />
-                          <span>Loan Approvals</span>
-                        </Link>
-                        <Link
-                          href="/admin/verification"
-                          onClick={() => setUserMenuOpen(false)}
-                          className="flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-[#F4F1E8] text-[#252C29] transition-colors"
-                        >
-                          <ShieldCheck className="h-4 w-4 text-[#183B32]" />
-                          <span>Document Review</span>
-                        </Link>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Sign Out */}
-                  <div className="p-1 border-t" style={{ borderColor: "#E5E1D7" }}>
-                    <button
-                      onClick={handleSignOut}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-[#B94B45]/10 text-[#B94B45] transition-colors"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      <span>Sign Out</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            /* Logged out state */
-            <div className="flex items-center gap-2">
-              <Link
-                href="/login"
-                className="text-xs font-semibold px-3 py-2 rounded-xl transition-colors hover:bg-[#F4F1E8]"
-                style={{ color: "#777B73" }}
-              >
-                Sign In
-              </Link>
-              <Link
-                href="/login?tab=signup"
-                className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl shadow-sm transition-all hover:scale-105"
+      {/* 1st Top Bar: Brand Logo & Web3 / User Actions */}
+      <div className="w-full border-b" style={{ borderColor: "#E5E1D7" }}>
+        <div className="flex h-16 items-center justify-between px-4 lg:px-8 max-w-screen-2xl mx-auto gap-3 sm:gap-4">
+          {/* Left: Brand Logo & Name */}
+          <div className="flex items-center gap-6 shrink-0">
+            <Link href={homeHref} className="flex items-center gap-2.5 group">
+              <div
+                className="h-9 w-9 rounded-xl flex items-center justify-center font-black text-sm shadow-sm transition-transform group-hover:scale-105"
                 style={{ backgroundColor: "#183B32", color: "#D6A85F" }}
               >
-                <Wallet className="h-3.5 w-3.5" />
-                <span>Get Started</span>
-              </Link>
-            </div>
-          )}
+                CC
+              </div>
+              <span className="text-xl font-bold tracking-tight" style={{ color: "#183B32" }}>
+                CredChain
+              </span>
+            </Link>
+          </div>
 
-          {/* Mobile hamburger (only shown when there are links or user is logged in) */}
-          {(isLoggedIn || (!isLandingOrAuthPage && activeNav.length > 0)) && (
-            <button
-              className="md:hidden p-2 rounded-xl hover:bg-[#F4F1E8] transition-colors"
-              onClick={() => setMobileOpen(!mobileOpen)}
-              style={{ color: "#252C29" }}
-            >
-              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
-          )}
+          {/* Right: MetaMask Live Pill, Network, CRED Balance, 1,000 ETH Faucet, +1,000 CRED Faucet, User Menu */}
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 ml-auto">
+            {/* MetaMask Live Connection Pill / Connect Button */}
+            {isConnected ? (
+              <div
+                className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-xl border font-mono font-semibold shrink-0"
+                style={{
+                  borderColor: "rgba(52,118,90,0.3)",
+                  backgroundColor: "rgba(52,118,90,0.08)",
+                  color: "#34765A",
+                }}
+                title={`MetaMask Wallet Connected: ${address}`}
+              >
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                <span>🦊 {shortenAddress(address || "")}</span>
+              </div>
+            ) : isDemoMode ? (
+              <div
+                onClick={handleConnectMetaMask}
+                className="cursor-pointer flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-xl border font-mono font-semibold shrink-0 transition-transform hover:scale-105"
+                style={{
+                  borderColor: "rgba(52,118,90,0.3)",
+                  backgroundColor: "rgba(52,118,90,0.08)",
+                  color: "#34765A",
+                }}
+                title="MetaMask Anvil Account (Click to connect interactive MetaMask)"
+              >
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                <span>🦊 {displayAddress}</span>
+              </div>
+            ) : (
+              <button
+                onClick={handleConnectMetaMask}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border transition-all shadow-sm hover:scale-105 shrink-0"
+                style={{
+                  borderColor: "rgba(214,168,95,0.5)",
+                  backgroundColor: "rgba(214,168,95,0.15)",
+                  color: "#8B6514",
+                }}
+                title="Connect your MetaMask wallet for interactive on-chain signing"
+              >
+                <Wallet className="h-3.5 w-3.5 text-[#D6A85F]" />
+                <span>Connect MetaMask</span>
+              </button>
+            )}
+
+            {/* Network badge (Anvil Local) */}
+            {(isConnected || isDemoMode) && (
+              <div
+                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg border font-mono shrink-0"
+                style={{ borderColor: "#E5E1D7", backgroundColor: "#F4F1E8" }}
+                title={`Network: ${networkName}`}
+              >
+                <span className="h-1.5 w-1.5 rounded-full animate-pulse shrink-0" style={{ backgroundColor: "#34765A" }} />
+                <span className="font-medium text-[#252C29] whitespace-nowrap">{networkName}</span>
+              </div>
+            )}
+
+            {/* CRED Token Balance */}
+            {(isConnected || isDemoMode) && (
+              <div
+                className="hidden xs:flex sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-mono shrink-0"
+                style={{ borderColor: "#E5E1D7", backgroundColor: "#F4F1E8" }}
+                title="CRED Balance in MetaMask"
+              >
+                <Coins className="h-3 w-3 shrink-0" style={{ color: "#D6A85F" }} />
+                <span className="font-bold text-[#252C29] whitespace-nowrap">{formatTokenAmount(credBalance)}</span>
+                <span className="text-[#777B73]">CRED</span>
+              </div>
+            )}
+
+            {/* Anvil ETH Faucet Button: 1,000 ETH */}
+            {(isConnected || isDemoMode) && (chainId === 31337 || isDemoMode) && (
+              <button
+                onClick={requestEthFaucet}
+                disabled={faucetLoading}
+                className="hidden sm:flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all hover:scale-105 active:scale-95 shrink-0"
+                style={{
+                  borderColor: "rgba(52,118,90,0.3)",
+                  backgroundColor: "rgba(52,118,90,0.08)",
+                  color: "#34765A",
+                }}
+                title="Request 1,000 ETH test funds on Anvil"
+              >
+                <Fuel className="h-3 w-3 shrink-0" />
+                <span className="whitespace-nowrap">{faucetSuccess ? "Credited!" : faucetLoading ? "..." : "1,000 ETH"}</span>
+              </button>
+            )}
+
+            {/* CRED Token Faucet Button (MetaMask): +1,000 CRED */}
+            {(isConnected || isDemoMode) && (
+              <button
+                onClick={handleCredFaucet}
+                disabled={credFaucetLoading}
+                className="hidden md:flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all hover:scale-105 active:scale-95 shrink-0"
+                style={{
+                  borderColor: "rgba(214,168,95,0.4)",
+                  backgroundColor: "rgba(214,168,95,0.12)",
+                  color: "#8B6514",
+                }}
+                title="Mint 1,000 CRED tokens via MetaMask"
+              >
+                <Coins className="h-3 w-3 text-[#D6A85F]" />
+                <span className="whitespace-nowrap">{credFaucetSuccess ? "Minted!" : credFaucetLoading ? "Signing..." : "+1,000 CRED"}</span>
+              </button>
+            )}
+
+            {/* Logged in state -> User Menu */}
+            {isLoggedIn ? (
+              <div className="relative shrink-0" ref={userMenuRef}>
+                <button
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all shadow-sm hover:border-[#183B32]/30 bg-white"
+                  style={{
+                    borderColor: "#E5E1D7",
+                  }}
+                >
+                  <div
+                    className="h-7 w-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0"
+                    style={{ backgroundColor: "#183B32", color: "#D6A85F" }}
+                  >
+                    {avatarInitials}
+                  </div>
+                  <div className="text-left hidden xs:block sm:block">
+                    <div className="text-xs font-bold leading-tight" style={{ color: "#252C29" }}>
+                      {accountLabel}
+                    </div>
+                    <div className="text-[10px] leading-tight" style={{ color: "#777B73" }}>
+                      {isDemoMode ? `Demo · ${ROLE_LABELS[role]}` : ROLE_LABELS[role]}
+                    </div>
+                  </div>
+                  <ChevronDown className="h-3.5 w-3.5 text-[#777B73] shrink-0" />
+                </button>
+
+                {/* User Dropdown */}
+                {userMenuOpen && (
+                  <div
+                    className="absolute right-0 top-full mt-2 w-60 rounded-2xl border bg-white shadow-xl overflow-hidden z-50 p-1"
+                    style={{ borderColor: "#E5E1D7" }}
+                  >
+                    <div className="p-3 border-b" style={{ borderColor: "#E5E1D7", backgroundColor: "#F4F1E8" }}>
+                      <div className="text-xs font-bold" style={{ color: "#252C29" }}>{accountLabel}</div>
+                      <div className="text-[11px] font-mono mt-0.5 text-[#777B73] truncate">
+                        {isDemoMode ? `Active Profile: ${ROLE_LABELS[role]}` : address}
+                      </div>
+                    </div>
+
+                    {/* Role-specific menu links */}
+                    <div className="p-1">
+                      {role === "borrower" && (
+                        <>
+                          <Link
+                            href="/credit-passport"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-[#F4F1E8] text-[#252C29] transition-colors"
+                          >
+                            <ShieldCheck className="h-4 w-4 text-[#183B32]" />
+                            <span>Credit Passport</span>
+                          </Link>
+                          <Link
+                            href="/reputation"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-[#F4F1E8] text-[#252C29] transition-colors"
+                          >
+                            <Award className="h-4 w-4 text-[#183B32]" />
+                            <span>My Reputation</span>
+                          </Link>
+                        </>
+                      )}
+
+                      {role === "lender" && (
+                        <Link
+                          href="/lender/investments"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-[#F4F1E8] text-[#252C29] transition-colors"
+                        >
+                          <Coins className="h-4 w-4 text-[#183B32]" />
+                          <span>My Investments</span>
+                        </Link>
+                      )}
+
+                      {role === "admin" && (
+                        <>
+                          <Link
+                            href="/admin/approvals"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-[#F4F1E8] text-[#252C29] transition-colors"
+                          >
+                            <FileCheck2 className="h-4 w-4 text-[#183B32]" />
+                            <span>Loan Approvals</span>
+                          </Link>
+                          <Link
+                            href="/admin/verification"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-[#F4F1E8] text-[#252C29] transition-colors"
+                          >
+                            <ShieldCheck className="h-4 w-4 text-[#183B32]" />
+                            <span>Document Review</span>
+                          </Link>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Sign Out */}
+                    <div className="p-1 border-t" style={{ borderColor: "#E5E1D7" }}>
+                      <button
+                        onClick={handleSignOut}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-[#B94B45]/10 text-[#B94B45] transition-colors"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Logged out state */
+              <div className="flex items-center gap-2 shrink-0">
+                <Link
+                  href="/login"
+                  className="text-xs font-semibold px-3 py-2 rounded-xl transition-colors hover:bg-[#F4F1E8]"
+                  style={{ color: "#777B73" }}
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href="/login?tab=signup"
+                  className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl shadow-sm transition-all hover:scale-105"
+                  style={{ backgroundColor: "#183B32", color: "#D6A85F" }}
+                >
+                  <Wallet className="h-3.5 w-3.5" />
+                  <span>Get Started</span>
+                </Link>
+              </div>
+            )}
+
+            {/* Mobile hamburger button */}
+            {(isLoggedIn || activeNav.length > 0) && (
+              <button
+                className="md:hidden p-2 rounded-xl hover:bg-[#F4F1E8] transition-colors shrink-0"
+                onClick={() => setMobileOpen(!mobileOpen)}
+                style={{ color: "#252C29" }}
+                aria-label="Toggle navigation menu"
+              >
+                {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Mobile Drawer (Switch role removed) */}
+      {/* 2nd Top Bar: Navigation Sections */}
+      {activeNav.length > 0 && (
+        <div
+          className="w-full border-b transition-all"
+          style={{
+            borderColor: "#E5E1D7",
+            backgroundColor: "#FAF8F5",
+          }}
+        >
+          <div className="flex h-11 items-center justify-between px-4 lg:px-8 max-w-screen-2xl mx-auto gap-4">
+            <nav className="flex items-center gap-1 sm:gap-1.5 py-1 overflow-x-auto scrollbar-none flex-1">
+              {activeNav.map((item) => {
+                const isActive =
+                  pathname === item.href ||
+                  (pathname.startsWith(item.href + "/") &&
+                    item.href !== "/borrower" &&
+                    item.href !== "/lender" &&
+                    item.href !== "/admin");
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all",
+                      isActive
+                        ? "font-semibold shadow-sm"
+                        : "hover:bg-[#EAE6DC]/70 hover:text-[#183B32]"
+                    )}
+                    style={
+                      isActive
+                        ? { backgroundColor: "#183B32", color: "#D6A85F" }
+                        : { color: "#666A64" }
+                    }
+                  >
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
+                    <span>{item.name}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+
+            {/* Perspective indicator badge on the far right of 2nd bar */}
+            <div className="hidden lg:flex items-center gap-1.5 text-[11px] font-semibold text-[#777B73] shrink-0 pl-3 border-l border-[#E5E1D7]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#34765A]" />
+              <span className="uppercase tracking-wider text-[10px] font-bold text-[#183B32]">
+                {ROLE_LABELS[role]} Workspace
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Drawer */}
       {mobileOpen && (
         <div className="md:hidden border-t p-4 space-y-4 bg-white" style={{ borderColor: "#E5E1D7" }}>
           {isLoggedIn && (
@@ -495,6 +553,39 @@ export function Navbar() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Quick on-chain tools on mobile */}
+          {(isConnected || isDemoMode) && (
+            <div className="flex flex-wrap gap-2 pt-1 pb-1">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg border font-mono bg-[#F4F1E8] border-[#E5E1D7]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#34765A] animate-pulse" />
+                <span className="font-medium text-[#252C29]">{networkName}</span>
+              </div>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-mono bg-[#F4F1E8] border-[#E5E1D7]">
+                <Coins className="h-3 w-3 text-[#D6A85F]" />
+                <span className="font-bold text-[#252C29]">{formatTokenAmount(credBalance)}</span>
+                <span className="text-[#777B73]">CRED</span>
+              </div>
+              {(chainId === 31337 || isDemoMode) && (
+                <button
+                  onClick={requestEthFaucet}
+                  disabled={faucetLoading}
+                  className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border text-[#34765A] bg-[#34765A]/10 border-[#34765A]/30"
+                >
+                  <Fuel className="h-3 w-3" />
+                  <span>{faucetSuccess ? "Credited!" : faucetLoading ? "..." : "1,000 ETH"}</span>
+                </button>
+              )}
+              <button
+                onClick={handleCredFaucet}
+                disabled={credFaucetLoading}
+                className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border text-[#8B6514] bg-[#D6A85F]/15 border-[#D6A85F]/40"
+              >
+                <Coins className="h-3 w-3 text-[#D6A85F]" />
+                <span>{credFaucetSuccess ? "Minted!" : credFaucetLoading ? "Signing..." : "+1,000 CRED"}</span>
+              </button>
             </div>
           )}
 
