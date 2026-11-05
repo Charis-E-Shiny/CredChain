@@ -7,7 +7,7 @@ Solidity Compiler: **0.8.24 (200 optimizer runs)**
 
 ```
 ======================================================================
-Ran 7 test suites in 121.98ms: 111 tests passed, 0 failed, 0 skipped
+Ran 9 test suites in 122ms: 132 tests passed, 0 failed, 0 skipped
 ======================================================================
 
 Suite 1: test/LoanManager.t.sol:LoanManagerTest
@@ -21,23 +21,31 @@ Suite 2: test/CredToken.t.sol:CredTokenTest
   - Fuzz tests: 3 passed (random minting, faucet, transfers)
   Total: 36 PASSED
 
-Suite 3: test/LoanEscrow.t.sol:LoanEscrowTest
+Suite 3: test/CreditPassportRegistry.t.sol:CreditPassportRegistryTest
+  - Passport registration, cryptographic hash verification, revocation: 13 passed
+  Total: 13 PASSED
+
+Suite 4: test/LoanEscrow.t.sol:LoanEscrowTest
   - Collateral deposit, release, seizure: 10 passed
   Total: 10 PASSED
 
-Suite 4: test/LoanGovernance.t.sol:LoanGovernanceTest
-  - Single approval, high-value multi-approval, duplicate rejection: 5 passed
-  Total: 5 PASSED
+Suite 5: test/VerificationRegistry.t.sol:VerificationRegistryTest
+  - Evidence attestation, salary slip hash anchoring, role management: 8 passed
+  Total: 8 PASSED
 
-Suite 5: test/CollateralOracle.t.sol:CollateralOracleTest
+Suite 6: test/CollateralOracle.t.sol:CollateralOracleTest
   - Price retrieval, staleness rejection, negative price rejection, LTV: 8 passed
   Total: 8 PASSED
 
-Suite 6: test/BorrowerReputation.t.sol:BorrowerReputationTest
+Suite 7: test/BorrowerReputation.t.sol:BorrowerReputationTest
   - Deterministic score, default penalty, double outcome guard: 7 passed
   Total: 7 PASSED
 
-Suite 7: test/Integration.t.sol:CredChainEndToEndIntegrationTest
+Suite 8: test/LoanGovernance.t.sol:LoanGovernanceTest
+  - Single approval, high-value multi-approval, duplicate rejection: 5 passed
+  Total: 5 PASSED
+
+Suite 9: test/Integration.t.sol:CredChainEndToEndIntegrationTest
   - Scenario 1 (Full happy path: request -> approve -> disburse -> repay -> score 100): PASSED
   - Scenario 3 (Default workflow: deadline expire -> markDefault -> score 0): PASSED
   Total: 2 PASSED
@@ -51,14 +59,17 @@ Framework: **Pytest 8.3.4 (Python 3.12.6)**
 
 ```
 ======================================================================
-tests/test_credit.py::test_health_endpoint PASSED              [ 14%]
-tests/test_credit.py::test_assess_valid_low_risk PASSED        [ 28%]
-tests/test_credit.py::test_assess_consent_required PASSED      [ 42%]
-tests/test_credit.py::test_assess_invalid_input PASSED         [ 57%]
-tests/test_credit.py::test_credit_history_endpoint PASSED      [ 71%]
-tests/test_credit.py::test_analytics_overview PASSED           [ 85%]
-tests/test_credit.py::test_borrower_profile PASSED             [100%]
-============================== 7 passed in 1.89s =====================
+Suite 1: tests/test_credit.py (7 passed)
+  - Health check, assessment validation, consent requirements, credit history, analytics
+Suite 2: tests/test_passport.py (4 passed)
+  - Canonical JSON serialization, SHA-256 hash consistency, lifecycle, wallet validation
+Suite 3: tests/test_scoring.py (22 passed)
+  - Verification standing hierarchy, score clamping, bytes32 deterministic hashing,
+    hash tampering detection, on-chain hash validation, automatic re-scoring on status change
+Suite 4: tests/test_verification.py (8 passed)
+  - OCR independent gross vs net extraction, 0% reconciliation variance,
+    EVIDENCE_CHECKED attestation, document deletion, admin review
+============================== 41 passed in 4.52s =====================
 ```
 
 ---

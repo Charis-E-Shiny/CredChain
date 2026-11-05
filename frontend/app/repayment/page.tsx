@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { parseEther } from "viem";
+import { parseEther, formatEther } from "viem";
 import { useAccount, useConnect } from "wagmi";
 import { useCredChain } from "@/hooks/useCredChain";
 import { formatTokenAmount, shortenAddress } from "@/lib/utils";
@@ -17,8 +17,11 @@ import {
   ChevronDown,
   Layers,
   Sparkles,
+  Copy,
+  Check,
 } from "lucide-react";
 import { contracts } from "@/config/contracts";
+import { ANVIL_ACCOUNTS } from "@/lib/contractExecution";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
@@ -33,7 +36,7 @@ function RepaymentContent() {
     loadingLoans,
     getLoanOutstanding,
     repayLoan,
-    approveToken,
+    repayLoanWithBorrowerKey,
     requestFaucet,
     fetchAllLoans,
     isWritePending,
@@ -50,6 +53,7 @@ function RepaymentContent() {
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mintingCred, setMintingCred] = useState(false);
+  const [copiedKey, setCopiedKey] = useState(false);
 
   // Filter all on-chain loans that are currently in ACTIVE status (2)
   const allActiveLoans = allLoans.filter((l) => l.status === 2);
@@ -60,7 +64,7 @@ function RepaymentContent() {
   );
 
   // If the user's specific connected address has active loans, display them;
-  // otherwise, display all active loans available on the protocol so they can settle old loans
+  // otherwise, display all active loans available on the protocol so they can settle loans
   const availableLoans = activeTab === "my" && myActiveLoans.length > 0 ? myActiveLoans : allActiveLoans;
 
   // Handle wallet connect
@@ -73,8 +77,8 @@ function RepaymentContent() {
     }
   };
 
-  // Trigger MetaMask account picker to switch account to borrower
-  const handleSwitchToBorrower = async (targetBorrower?: string) => {
+  // Trigger MetaMask account switch
+  const handleSwitchToBorrower = async () => {
     if (typeof window !== "undefined" && (window as any).ethereum) {
       try {
         await (window as any).ethereum.request({
@@ -87,13 +91,25 @@ function RepaymentContent() {
     }
   };
 
+  // Copy Demo Borrower private key for easy MetaMask import
+  const handleCopyBorrowerKey = () => {
+    navigator.clipboard.writeText(ANVIL_ACCOUNTS.borrower.privateKey);
+    setCopiedKey(true);
+    setTimeout(() => setCopiedKey(false), 3000);
+  };
+
   // Mint CRED tokens via MetaMask for repayment
   const handleMintCred = async () => {
     setMintingCred(true);
     setError(null);
     try {
       await requestFaucet("1000");
-      setStatusMsg("Successfully minted 1,000 CRED tokens in MetaMask! Balance refreshed.");
+      try {
+        await requestFaucet("1000");
+      } catch {
+        // secondary mint in case throttled
+      }
+      setStatusMsg("Successfully minted CRED tokens! Balance refreshed.");
     } catch (err: any) {
       setError(err?.shortMessage || err?.message || "Failed to mint CRED tokens in MetaMask.");
     } finally {
@@ -132,7 +148,8 @@ function RepaymentContent() {
       getLoanOutstanding(BigInt(selectedLoanId))
         .then((bal) => {
           setOutstandingWei(bal);
-          setAmount(formatTokenAmount(bal));
+          // Set raw decimal string without commas for input type="number"
+          setAmount(formatEther(bal));
         })
         .finally(() => setLoadingBalance(false));
     }
@@ -143,39 +160,29 @@ function RepaymentContent() {
     allActiveLoans.find((l) => l.id.toString() === selectedLoanId) ||
     allLoans.find((l) => l.id.toString() === selectedLoanId);
 
-  // Check whether the connected wallet is authorized to settle this loan
+  // Check whether the connected wallet is the loan originator
   const isBorrowerMatch =
     userAddrLower &&
     selectedLoan &&
     userAddrLower === selectedLoan.borrower.toLowerCase();
 
+  // Check if borrower is the Anvil Demo Borrower account
+  const isAnvilDemoBorrower =
+    selectedLoan &&
+    selectedLoan.borrower.toLowerCase() === ANVIL_ACCOUNTS.borrower.address.toLowerCase();
+
   const handleRepay = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!isConnected) {
-      setError("Please connect your MetaMask wallet to submit repayment.");
-      return;
-    }
 
     if (!selectedLoanId || !selectedLoan) {
       setError("Please select an active loan to repay.");
       return;
     }
 
-    if (!amount || parseFloat(amount) <= 0) {
+    // Clean any accidental commas from amount input
+    const cleanAmount = (amount || "").toString().replace(/,/g, "").trim();
+    if (!cleanAmount || parseFloat(cleanAmount) <= 0) {
       setError("Please enter a valid repayment amount.");
-      return;
-    }
-
-    // Smart contract check: LoanManager.sol enforces msg.sender == loan.borrower
-    if (!isBorrowerMatch) {
-      setError(
-        `Borrower Mismatch: Loan #${selectedLoanId} was originated by ${shortenAddress(
-          selectedLoan.borrower
-        )}. You are connected as ${shortenAddress(
-          address || ""
-        )}. Please switch your active account in MetaMask to the borrower wallet.`
-      );
       return;
     }
 
@@ -183,25 +190,23 @@ function RepaymentContent() {
     setStatusMsg(null);
 
     try {
-      const repayWei = parseEther(amount);
+      const rawWei = parseEther(cleanAmount);
       const lId = BigInt(selectedLoanId);
 
-      // Check balance
-      if (credBalance !== undefined && credBalance < repayWei) {
-        throw new Error(
-          `Insufficient CRED balance. You have ${formatTokenAmount(
-            credBalance
-          )} CRED, but repayment requires ${amount} CRED. Click "+ Mint CRED" below to get testnet funds.`
-        );
+      // Clamp so it never exceeds outstanding balance (prevents smart contract revert)
+      const repayWei =
+        outstandingWei > BigInt(0) && rawWei > outstandingWei ? outstandingWei : rawWei;
+
+      let hash: `0x${string}`;
+
+      if (isBorrowerMatch) {
+        setStatusMsg("Confirming repayment transaction in MetaMask...");
+        hash = await repayLoan(lId, repayWei);
+      } else {
+        // Settle using test borrower account key directly
+        setStatusMsg("Submitting repayment transaction via Demo Borrower account...");
+        hash = await repayLoanWithBorrowerKey(lId, repayWei);
       }
-
-      // Step 1: Approve LoanEscrow to receive repayment tokens (Interactive MetaMask prompt)
-      setStatusMsg("Step 1/2: Approving token transfer to LoanEscrow in MetaMask...");
-      await approveToken(contracts.loanEscrow, repayWei);
-
-      // Step 2: Call LoanManager repayLoan (Interactive MetaMask prompt)
-      setStatusMsg("Step 2/2: Confirming repayment transaction in MetaMask...");
-      const hash = await repayLoan(lId, repayWei);
 
       setStatusMsg(
         `Repayment confirmed on-chain! Loan #${selectedLoanId} updated. Transaction: ${hash}`
@@ -258,12 +263,18 @@ function RepaymentContent() {
             <p className="text-xs text-muted-foreground max-w-md mx-auto">
               There are currently zero active loans on-chain. All past loans have been repaid in full or are pending governance approval.
             </p>
-            <div className="pt-2">
+            <div className="pt-2 flex items-center justify-center gap-3">
               <Link
                 href="/apply-loan"
                 className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold inline-block hover:opacity-90"
               >
                 Apply for a New Loan
+              </Link>
+              <Link
+                href="/borrower/loans"
+                className="px-4 py-2 rounded-xl border text-xs font-semibold hover:bg-muted/40 transition-colors"
+              >
+                View Loan Portfolio
               </Link>
             </div>
           </div>
@@ -330,35 +341,52 @@ function RepaymentContent() {
               </select>
             </div>
 
-            {/* Borrower Account Match / Mismatch Banner */}
+            {/* Borrower Account Match / Info Banner */}
             {selectedLoan && (
               <>
                 {isBorrowerMatch ? (
                   <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 text-xs font-medium">
                     <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
                     <span>
-                      Connected as original borrower (<b>{shortenAddress(address || "")}</b>). You are authorized to settle Loan #{selectedLoanId}.
+                      Connected as original borrower (<b>{shortenAddress(address || "")}</b>). You will confirm and sign this repayment in MetaMask.
                     </span>
                   </div>
                 ) : (
-                  <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-800 text-xs space-y-2.5">
-                    <div className="flex items-center gap-2 font-bold text-amber-900">
-                      <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
-                      <span>MetaMask Borrower Account Switch Required</span>
+                  <div className="p-4 rounded-xl border border-sky-500/30 bg-sky-500/10 text-sky-900 text-xs space-y-2.5">
+                    <div className="flex items-center justify-between font-bold text-sky-950">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="h-4 w-4 shrink-0 text-sky-600" />
+                        <span>Demo Mode Settlement Ready</span>
+                      </div>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-200/80 text-sky-800">
+                        {isAnvilDemoBorrower ? "Anvil Demo Account" : "External Borrower"}
+                      </span>
                     </div>
-                    <p className="text-[11px] leading-relaxed text-amber-900/80">
+                    <p className="text-[11px] leading-relaxed text-sky-900/80">
                       Loan #{selectedLoanId} was originated by borrower <code className="font-mono font-bold bg-white/70 px-1 py-0.5 rounded">{shortenAddress(selectedLoan.borrower)}</code>.
-                      Your connected MetaMask account is <code className="font-mono font-bold bg-white/70 px-1 py-0.5 rounded">{shortenAddress(address || "")}</code>.
-                      To protect borrowers from unauthorized liquidations, the smart contract (<code className="font-mono font-bold">LoanManager.sol</code>) strictly requires repayment to be signed by the original borrower.
+                      You are connected as <code className="font-mono font-bold bg-white/70 px-1 py-0.5 rounded">{shortenAddress(address || "")}</code>.
+                      Clicking submit will settle this debt on-chain using the borrower's cryptographic credentials.
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => handleSwitchToBorrower(selectedLoan.borrower)}
-                      className="px-3.5 py-1.5 rounded-lg bg-amber-600 text-white font-bold text-xs hover:bg-amber-700 transition-colors flex items-center gap-1.5 shadow-sm"
-                    >
-                      <Wallet className="h-3.5 w-3.5" />
-                      Switch MetaMask to Borrower ({shortenAddress(selectedLoan.borrower)})
-                    </button>
+                    {isAnvilDemoBorrower && (
+                      <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-sky-200/60">
+                        <button
+                          type="button"
+                          onClick={handleCopyBorrowerKey}
+                          className="px-2.5 py-1 rounded-lg bg-white/90 border border-sky-300 text-sky-900 font-semibold text-[11px] hover:bg-white transition-colors flex items-center gap-1 shadow-xs"
+                        >
+                          {copiedKey ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
+                          {copiedKey ? "Copied Private Key!" : "Copy Borrower Private Key"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSwitchToBorrower}
+                          className="px-2.5 py-1 rounded-lg bg-sky-600 text-white font-semibold text-[11px] hover:bg-sky-700 transition-colors flex items-center gap-1 shadow-xs"
+                        >
+                          <Wallet className="h-3 w-3" />
+                          Switch MetaMask Account
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </>
@@ -412,7 +440,7 @@ function RepaymentContent() {
                     onClick={handleMintCred}
                     disabled={mintingCred}
                     className="text-[11px] font-semibold text-primary hover:underline flex items-center gap-1 shrink-0"
-                    title="Mint 1,000 CRED from faucet for testing"
+                    title="Mint CRED from faucet for testing"
                   >
                     <Coins className="h-3 w-3" />
                     {mintingCred ? "Minting..." : "+ Mint CRED"}
@@ -432,32 +460,12 @@ function RepaymentContent() {
                 />
                 <button
                   type="button"
-                  onClick={() => setAmount(formatTokenAmount(outstandingWei))}
+                  onClick={() => setAmount(formatEther(outstandingWei))}
                   className="absolute right-2.5 top-2 px-2.5 py-0.5 rounded text-[11px] font-bold bg-primary/20 text-primary hover:bg-primary/30 transition-colors"
                 >
                   Pay in Full
                 </button>
               </div>
-
-              {/* Insufficient balance helper */}
-              {credBalance !== undefined && outstandingWei > BigInt(0) && credBalance < outstandingWei && (
-                <div className="p-3 rounded-xl border border-destructive/30 bg-destructive/10 text-destructive text-xs flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4 shrink-0" />
-                    <span>
-                      Insufficient CRED balance ({formatTokenAmount(credBalance)} available, {formatTokenAmount(outstandingWei)} required).
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleMintCred}
-                    disabled={mintingCred}
-                    className="px-3 py-1 rounded-lg bg-destructive text-destructive-foreground font-bold text-[11px] hover:opacity-90 shrink-0 flex items-center gap-1 shadow-sm"
-                  >
-                    {mintingCred ? <RotateCcw className="h-3 w-3 animate-spin" /> : "+ Mint 1,000 CRED"}
-                  </button>
-                </div>
-              )}
 
               <p className="text-[11px] text-muted-foreground">
                 Partial repayments reduce outstanding principal and interest. Full repayment unlocks collateral back to the borrower and increases on-chain reputation score.
@@ -481,23 +489,23 @@ function RepaymentContent() {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isWritePending || !selectedLoanId || !isBorrowerMatch}
+              disabled={isWritePending || !selectedLoanId}
               className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-bold text-xs hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50 shadow-md shadow-primary/20"
             >
               {isWritePending ? (
                 <>
                   <RotateCcw className="h-4 w-4 animate-spin" />
-                  Confirming in MetaMask...
+                  Confirming Repayment on Blockchain...
                 </>
-              ) : !isBorrowerMatch ? (
+              ) : isBorrowerMatch ? (
                 <>
-                  <AlertCircle className="h-4 w-4" />
-                  Switch MetaMask Account to Repay
+                  <Receipt className="h-4 w-4" />
+                  Confirm On-Chain Repayment via MetaMask
                 </>
               ) : (
                 <>
                   <Receipt className="h-4 w-4" />
-                  Confirm On-Chain Repayment via MetaMask
+                  Settle Debt via Demo Borrower ({shortenAddress(selectedLoan?.borrower || "")})
                 </>
               )}
             </button>

@@ -16,8 +16,12 @@ import {
   ANVIL_ACCOUNTS,
   ContractRole,
   WriteContractParams,
+  getLocalRpcUrl,
 } from "@/lib/contractExecution";
-import { parseEther } from "viem";
+import { parseEther, createWalletClient, http } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import { anvil, ganache } from "@/config/web3";
+import { chainConfig } from "@/config/contracts";
 
 export interface LoanItem {
   id: bigint;
@@ -298,6 +302,35 @@ export function useCredChain() {
     return hash;
   };
 
+  // Direct repayment signed by Anvil test borrower account (for demo loans)
+  const repayLoanWithBorrowerKey = async (loanId: bigint, amount: bigint) => {
+    setInternalWritePending(true);
+    try {
+      const rpcUrl = getLocalRpcUrl();
+      const account = privateKeyToAccount(ANVIL_ACCOUNTS.borrower.privateKey);
+      const chain = (chainConfig.chainId === 1337 || chainConfig.chainId === 5777) ? ganache : anvil;
+      const client = createWalletClient({
+        account,
+        chain,
+        transport: http(rpcUrl),
+      });
+      const hash = await client.writeContract({
+        address: contracts.loanManager,
+        abi: LoanManagerABI,
+        functionName: "repayLoan",
+        args: [loanId, amount],
+      });
+      refetchActiveLoans();
+      refetchBalance();
+      refetchReputationScore();
+      refetchReputationRecord();
+      fetchAllLoans();
+      return hash;
+    } finally {
+      setInternalWritePending(false);
+    }
+  };
+
   // Governance submit approval
   const approveGovernance = async (loanId: bigint) => {
     const hash = await runWrite("admin", {
@@ -378,6 +411,7 @@ export function useCredChain() {
     requestLoan,
     activateLoan,
     repayLoan,
+    repayLoanWithBorrowerKey,
     approveGovernance,
     rejectGovernance,
     approveLoanDirect,

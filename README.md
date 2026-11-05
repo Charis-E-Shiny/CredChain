@@ -237,24 +237,12 @@ Ran 9 test suites in 133.22ms: 132 tests passed, 0 failed, 0 skipped
   - LoanGovernanceTest:           5 passed (Multi-sig thresholds, Rejections)
   - IntegrationTest:              2 passed (Full happy path & default workflow)
 
-Backend Pytest Suite: 16 passed in 3.72s
+Backend Pytest Suite: 41 passed in 4.52s
 ======================================================================
-  - test_health_endpoint: PASSED
-  - test_assess_valid_low_risk: PASSED
-  - test_assess_consent_required: PASSED
-  - test_assess_invalid_input: PASSED
-  - test_credit_history_endpoint: PASSED
-  - test_analytics_overview: PASSED
-  - test_borrower_profile: PASSED
-  - test_canonical_json_and_hashing_consistency: PASSED
-  - test_generate_passport_missing_consent: PASSED
-  - test_generate_passport_invalid_wallet: PASSED
-  - test_passport_lifecycle: PASSED
-  - test_verification_status_default_unverified: PASSED
-  - test_verification_process_evidence_checked: PASSED
-  - test_verification_process_discrepancy_flags_manual_review: PASSED
-  - test_admin_review_can_assign_source_verified: PASSED
-  - test_credit_assessment_integration_returns_verification_attributes: PASSED
+  - test_credit.py:             7 passed (Health, Credit assessment, History, Analytics)
+  - test_passport.py:           4 passed (Canonical hashing, Lifecycle, Consent checks)
+  - test_scoring.py:           22 passed (Standing order, Tamper detection, Re-scoring)
+  - test_verification.py:       8 passed (OCR Gross/Net extraction, Discrepancies, Deletion)
 ```
 
 ---

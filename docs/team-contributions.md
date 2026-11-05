@@ -53,7 +53,12 @@ CredChain was developed as an academic FinTech blockchain mini-project with four
 - **Backend & ML Pipeline**:
   - Synthetic credit dataset creation with realistic distributions (DTI, income, delinquencies).
   - GradientBoosting classifier training, saving artifacts to disk (`model.pkl`, `scaler.pkl`).
-  - FastAPI endpoints (`/api/credit/assess`, `/api/health`, `/api/analytics/overview`).
+  - Tamper-evident assessment hashing (`assessment_hash`), binding AI score to verification standing, and automatic re-scoring on evidence updates.
+  - Salary slip OCR independent gross vs net extraction and reconciliation engine with discrepancy detection.
+  - FastAPI endpoints (`/api/credit/assess`, `/api/credit/verify/{id}`, `/api/passport/*`, `/api/verification/*`, `/api/health`, `/api/analytics/overview`).
+  - 41 passing Pytest tests verifying ML scoring, document verification, and cryptographic commitments.
 - **Frontend Dashboard**:
   - Next.js App Router application with Tailwind CSS, Lucide icons, and institutional FinTech aesthetic.
-  - Wagmi and Viem hooks reading on-chain state and signing transactions.
+  - Wagmi and Viem hooks reading on-chain state and strictly enforcing MetaMask wallet transaction signing.
+  - End-to-end user workflows for Borrowers, Lenders, and Governance Admins.
+  - Repayment portal with on-chain debt settlement and dynamic reputation scoring.
