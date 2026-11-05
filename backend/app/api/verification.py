@@ -81,6 +81,21 @@ async def upload_verification_document(
         raise HTTPException(status_code=400, detail=str(exc))
 
 
+@router.delete("/document/{document_id}")
+def delete_verification_document(
+    document_id: str,
+    wallet_address: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Remove an uploaded verification document and re-evaluate verification standing.
+    """
+    success = VerificationService.delete_document(db, document_id, wallet_address)
+    if not success:
+        raise HTTPException(status_code=404, detail="Document not found or access denied.")
+    return {"message": "Document deleted successfully.", "document_id": document_id}
+
+
 @router.post("/process", response_model=DiscrepancyReport)
 def process_verification(
     request: ProcessVerificationRequest,

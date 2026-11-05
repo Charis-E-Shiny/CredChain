@@ -16,11 +16,10 @@ import {
 } from "lucide-react";
 import { chainConfig } from "@/config/contracts";
 
-// Borrower nav
+// Borrower nav — AI Assessment and Verification merged into unified underwriting hub
 const borrowerNav = [
   { name: "Overview",       href: "/borrower",          icon: LayoutDashboard },
-  { name: "AI Assessment",  href: "/credit-assessment", icon: BrainCircuit },
-  { name: "Verification",   href: "/verification",      icon: ShieldCheck },
+  { name: "AI Assessment & Verification", href: "/credit-assessment", icon: BrainCircuit },
   { name: "Apply for Loan", href: "/apply-loan",        icon: FilePlus2 },
   { name: "My Loans",       href: "/borrower/loans",    icon: Layers },
   { name: "Repayments",     href: "/repayment",         icon: Receipt },

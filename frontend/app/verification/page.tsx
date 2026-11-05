@@ -16,6 +16,8 @@ import {
   RefreshCw,
   ChevronRight,
   Info,
+  Trash2,
+  BrainCircuit,
 } from "lucide-react";
 import {
   VerificationStatusResponse,
@@ -87,7 +89,38 @@ export default function VerificationPage() {
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [docType, setDocType] = useState("salary_slip");
+  const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDeleteDocument = async (docId: string, fileName: string) => {
+    if (!confirm(`Are you sure you want to remove "${fileName}"?`)) return;
+
+    setDeletingDocId(docId);
+    setError(null);
+    setSuccessMsg(null);
+
+    try {
+      const res = await fetch(
+        `${chainConfig.apiUrl}/api/verification/document/${docId}?wallet_address=${activeAddress}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (!res.ok) {
+        const errJson = await res.json();
+        throw new Error(errJson.detail || "Failed to remove document");
+      }
+
+      setSuccessMsg(`"${fileName}" was removed successfully.`);
+      await fetchStatus();
+      setDiscrepancy(null);
+    } catch (err: any) {
+      setError(err.message || "Failed to delete document.");
+    } finally {
+      setDeletingDocId(null);
+    }
+  };
 
   // Fetch verification status from backend
   const fetchStatus = async () => {
@@ -457,7 +490,7 @@ export default function VerificationPage() {
                           </div>
                         </div>
                       </div>
-                      <div className="text-right">
+                      <div className="flex items-center gap-2">
                         {doc.extracted_income ? (
                           <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-[#34765A]/10 text-[#34765A]">
                             Extracted: ${doc.extracted_income.toLocaleString()}
@@ -467,6 +500,21 @@ export default function VerificationPage() {
                             Manual Review
                           </span>
                         )}
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteDocument(doc.id, doc.file_name)}
+                          disabled={deletingDocId === doc.id}
+                          title="Remove uploaded document"
+                          className="p-1.5 rounded-lg border border-[#B94B45]/30 text-[#B94B45] hover:bg-[#B94B45]/10 transition-colors disabled:opacity-50 flex items-center gap-1 text-[11px]"
+                        >
+                          {deletingDocId === doc.id ? (
+                            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-3.5 w-3.5" />
+                          )}
+                          <span className="hidden sm:inline">Remove</span>
+                        </button>
                       </div>
                     </div>
                   ))}

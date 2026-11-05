@@ -114,6 +114,84 @@ class VerificationService:
         return doc_record
 
     @classmethod
+    def delete_document(
+        cls,
+        db: Session,
+        document_id: str,
+        wallet_address: Optional[str] = None,
+    ) -> bool:
+        """Securely remove an uploaded document, delete file from disk, and adjust verification standing."""
+        query = db.query(VerificationDocument).filter(VerificationDocument.id == document_id)
+        if wallet_address:
+            clean_wallet = wallet_address.lower().strip()
+            query = query.filter(VerificationDocument.wallet_address == clean_wallet)
+        doc = query.first()
+        if not doc:
+            return False
+
+        clean_wallet = doc.wallet_address
+        stored_path = doc.stored_path
+        filename = doc.file_name
+
+        # Remove physical file if exists
+        try:
+            if stored_path and os.path.exists(stored_path):
+                os.remove(stored_path)
+        except Exception as e:
+            logger.warning("Could not delete stored file %s: %s", stored_path, e)
+
+        # Remove doc record from DB
+        db.delete(doc)
+        db.commit()
+
+        # Check remaining documents
+        remaining_docs = (
+            db.query(VerificationDocument)
+            .filter(VerificationDocument.wallet_address == clean_wallet)
+            .all()
+        )
+
+        bv = (
+            db.query(BorrowerVerification)
+            .filter(BorrowerVerification.wallet_address == clean_wallet)
+            .first()
+        )
+
+        if bv:
+            if not remaining_docs:
+                # Reset to UNVERIFIED if no documents left (unless SOURCE_VERIFIED by admin)
+                if bv.status != VerificationStatusEnum.SOURCE_VERIFIED.value:
+                    bv.status = VerificationStatusEnum.UNVERIFIED.value
+                    bv.extracted_monthly_income = 0.0
+                    bv.discrepancy_percentage = 0.0
+                    bv.verifier_notes = "All evidence documents removed. Verification reset to UNVERIFIED."
+                    now_iso = datetime.now(timezone.utc).isoformat()
+                    bv.record_hash = _canonical_record_hash(clean_wallet, bv.status, bv.declared_monthly_income, 0.0, 0.0, now_iso)
+            else:
+                # Re-evaluate with remaining documents if not SOURCE_VERIFIED
+                if bv.status != VerificationStatusEnum.SOURCE_VERIFIED.value:
+                    cls.evaluate_verification(
+                        db=db,
+                        wallet_address=clean_wallet,
+                        declared_annual_income=bv.declared_annual_income or 75000,
+                        declared_monthly_debt=bv.declared_monthly_debt or 0,
+                        declared_employment_years=bv.declared_employment_years or 0,
+                    )
+
+            hist = VerificationHistory(
+                wallet_address=clean_wallet,
+                previous_status=bv.status,
+                new_status=bv.status,
+                changed_by="borrower:delete_document",
+                reason=f"Removed document {filename}",
+                record_hash=bv.record_hash,
+            )
+            db.add(hist)
+            db.commit()
+
+        return True
+
+    @classmethod
     def evaluate_verification(
         cls,
         db: Session,

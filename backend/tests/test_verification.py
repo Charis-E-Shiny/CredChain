@@ -163,3 +163,41 @@ def test_credit_assessment_integration_returns_verification_attributes(client):
     assert "requires_manual_review" in data
     assert data["declared_income"] == 85000.0
     assert data["verification_status"] == "UNVERIFIED"
+
+
+def test_delete_verification_document(client, tmp_path):
+    """Uploading and then deleting a document removes it and resets status."""
+    import fitz
+    test_wallet = "0x6666666666666666666666666666666666666666"
+
+    # Create valid dummy PDF
+    pdf_path = tmp_path / "temp_salary.pdf"
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text((50, 100), "Net Salary: Rs. 80,000.00")
+    doc.save(str(pdf_path))
+
+    with open(pdf_path, "rb") as f:
+        up_res = client.post(
+            "/api/verification/upload",
+            data={"wallet_address": test_wallet, "document_type": "salary_slip"},
+            files={"file": ("temp_salary.pdf", f, "application/pdf")},
+        )
+    assert up_res.status_code == 200
+    doc_id = up_res.json()["document_id"]
+
+    # Verify document appears in status
+    st_res = client.get(f"/api/verification/status/{test_wallet}")
+    assert st_res.status_code == 200
+    assert len(st_res.json()["documents"]) == 1
+
+    # Delete the document
+    del_res = client.delete(f"/api/verification/document/{doc_id}?wallet_address={test_wallet}")
+    assert del_res.status_code == 200
+    assert del_res.json()["document_id"] == doc_id
+
+    # Verify document is removed
+    st_res_after = client.get(f"/api/verification/status/{test_wallet}")
+    assert st_res_after.status_code == 200
+    assert len(st_res_after.json()["documents"]) == 0
+    assert st_res_after.json()["status"] == "UNVERIFIED"
