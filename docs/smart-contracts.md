@@ -13,6 +13,7 @@ stateDiagram-v2
     REQUESTED --> REJECTED: rejectLoan() [via LoanGovernance]
     REQUESTED --> CANCELLED: cancelLoan() [by Borrower]
     APPROVED --> ACTIVE: activateLoan() [by Lender]
+    APPROVED --> CANCELLED: cancelLoan() [by Borrower, approval expired]
     ACTIVE --> REPAID: repayLoan() [Total balance cleared]
     ACTIVE --> DEFAULTED: markDefault() [Deadline exceeded]
     REPAID --> [*]
@@ -29,10 +30,23 @@ stateDiagram-v2
 | REQUESTED | REJECTED | Governance or OPERATOR | status == REQUESTED |
 | REQUESTED | CANCELLED | Borrower | status == REQUESTED |
 | APPROVED | ACTIVE | Any lender | `block.timestamp <= approvalTime + 7 days` |
+| APPROVED | CANCELLED | Borrower | `block.timestamp > approvalTime + 7 days` |
 | ACTIVE | REPAID | Borrower | cumulative repayment >= principal + interest |
 | ACTIVE | DEFAULTED | Anyone | `block.timestamp > repaymentDeadline` |
 
-**Known gap:** No function moves an APPROVED loan whose approval has expired. `activateLoan` reverts with `ApprovalExpired`, and the loan stays in APPROVED. It also counts toward the borrower's `MAX_ACTIVE_LOANS_PER_BORROWER` cap, so five expired approvals block new requests. `cancelLoan` only works from REQUESTED. Tests characterizing this are in `test/LoanManagerInvariant.t.sol` (`test_KnownGap_*`).
+### Token Settlement
+
+`LoanManager` moves tokens through `LoanEscrow` at each step, so the caller must first approve the escrow:
+
+| Step | Approval needed | Token movement |
+|------|-----------------|----------------|
+| `requestLoan` | Borrower: collateral | Collateral locked in escrow |
+| `activateLoan` | Lender: principal | Principal sent from lender to borrower |
+| `repayLoan` | Borrower: amount | Payment forwarded to lender; final payment releases collateral |
+| `markDefault` | None | Collateral seized for lender |
+| `rejectLoan` / `cancelLoan` | None | Collateral refunded to borrower |
+
+**Known gap:** An APPROVED loan whose approval has expired stays in APPROVED until the borrower calls `cancelLoan`, which refunds the collateral. `activateLoan` reverts with `ApprovalExpired`, and the loan counts toward the borrower's `MAX_ACTIVE_LOANS_PER_BORROWER` cap until cancelled. Tests characterizing this are in `test/LoanManagerInvariant.t.sol` (`test_KnownGap_*`).
 
 **Interest:** `_calculateTotalOwed` applies a flat rate, `principal * (10000 + bps) / 10000`, and ignores `duration`. Owed is the same for a 1-day loan and a 365-day loan at the same rate. Time-based simple interest is not implemented.
 

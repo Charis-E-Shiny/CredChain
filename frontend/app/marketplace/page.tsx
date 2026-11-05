@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useCredChain, LoanItem } from "@/hooks/useCredChain";
 import { useConnect } from "wagmi";
+import { contracts } from "@/config/contracts";
 import { formatTokenAmount, shortenAddress, loanStatusLabels, loanStatusColors } from "@/lib/utils";
 import {
   Store,
@@ -28,6 +29,7 @@ export default function MarketplacePage() {
     marketplaceLoans,
     loadingLoans,
     activateLoan,
+    approveToken,
     isWritePending,
     fetchAllLoans,
   } = useCredChain();
@@ -53,6 +55,16 @@ export default function MarketplacePage() {
     setErrorMsg(null);
 
     try {
+      const loan = marketplaceLoans.find((l) => l.id === loanId);
+      if (!loan) throw new Error(`Loan #${loanId.toString()} is no longer available.`);
+      if (credBalance !== undefined && credBalance < loan.principal) {
+        throw new Error(
+          `Insufficient CRED balance. Funding requires ${formatTokenAmount(loan.principal)} CRED, but you have ${formatTokenAmount(credBalance)} CRED.`
+        );
+      }
+
+      // activateLoan pulls the principal through LoanEscrow, so it must be approved first
+      await approveToken(contracts.loanEscrow, loan.principal, "lender");
       const hash = await activateLoan(loanId);
       setTxMessage(`Loan #${loanId.toString()} funded & activated successfully! You are now the registered lender. Tx: ${hash}`);
       await fetchAllLoans();

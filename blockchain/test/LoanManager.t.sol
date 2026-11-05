@@ -34,6 +34,8 @@ contract LoanManagerTest is Test {
     uint256 constant DURATION = 30 days;
     uint256 constant INTEREST_BPS = 500; // 5%
     bytes32 constant RISK_HASH = keccak256("test-risk-assessment");
+    uint256 constant STARTING_BALANCE = 100_000 * 1e18;
+    uint256 constant TOTAL_OWED = 1050 * 1e18;
 
     /// @dev Events mirrored for expectEmit
     event LoanRequested(uint256 indexed loanId, address indexed borrower, uint256 amount, uint256 collateral);
@@ -78,6 +80,16 @@ contract LoanManagerTest is Test {
         // (governance address acts as caller via its submitApproval/rejectLoan)
 
         vm.stopPrank();
+
+        _fund(borrower);
+        _fund(borrower2);
+        _fund(lender);
+    }
+
+    function _fund(address account) internal {
+        deal(address(token), account, STARTING_BALANCE);
+        vm.prank(account);
+        token.approve(address(escrow), type(uint256).max);
     }
 
     // ============================
@@ -698,5 +710,109 @@ contract LoanManagerTest is Test {
         assertEq(loan.repaid, totalOwed);
 
         vm.stopPrank();
+    }
+
+    // ============================
+    //  Token Custody
+    // ============================
+
+    function test_Custody_RequestLocksCollateral() public {
+        uint256 loanId = _requestLoan();
+
+        assertEq(token.balanceOf(borrower), STARTING_BALANCE - COLLATERAL_AMOUNT);
+        assertEq(escrow.getCollateralBalance(loanId), COLLATERAL_AMOUNT);
+    }
+
+    function test_Custody_ActivationMovesPrincipalFromLenderToBorrower() public {
+        _createActiveLoan();
+
+        assertEq(token.balanceOf(lender), STARTING_BALANCE - LOAN_AMOUNT);
+        assertEq(token.balanceOf(borrower), STARTING_BALANCE - COLLATERAL_AMOUNT + LOAN_AMOUNT);
+        assertEq(token.balanceOf(address(escrow)), COLLATERAL_AMOUNT);
+    }
+
+    function test_Custody_PartialRepaymentPaysLenderAndKeepsCollateral() public {
+        uint256 loanId = _createActiveLoan();
+
+        vm.prank(borrower);
+        loanManager.repayLoan(loanId, 400e18);
+
+        assertEq(token.balanceOf(lender), STARTING_BALANCE - LOAN_AMOUNT + 400e18);
+        assertEq(token.balanceOf(borrower), STARTING_BALANCE - COLLATERAL_AMOUNT + LOAN_AMOUNT - 400e18);
+        assertEq(escrow.getCollateralBalance(loanId), COLLATERAL_AMOUNT);
+    }
+
+    function test_Custody_FullRepaymentPaysLenderAndReleasesCollateral() public {
+        uint256 loanId = _createActiveLoan();
+
+        vm.prank(borrower);
+        loanManager.repayLoan(loanId, TOTAL_OWED);
+
+        assertEq(token.balanceOf(lender), STARTING_BALANCE - LOAN_AMOUNT + TOTAL_OWED);
+        assertEq(token.balanceOf(borrower), STARTING_BALANCE + LOAN_AMOUNT - TOTAL_OWED);
+        assertEq(token.balanceOf(address(escrow)), 0);
+    }
+
+    function test_Custody_RepaymentRevertsWithoutAllowance() public {
+        uint256 loanId = _createActiveLoan();
+
+        vm.startPrank(borrower);
+        token.approve(address(escrow), 0);
+        vm.expectRevert();
+        loanManager.repayLoan(loanId, TOTAL_OWED);
+        vm.stopPrank();
+
+        assertEq(loanManager.getLoan(loanId).repaid, 0);
+        assertEq(uint256(loanManager.getLoanStatus(loanId)), uint256(ILoanManager.LoanStatus.ACTIVE));
+    }
+
+    function test_Custody_DefaultSeizesCollateralForLender() public {
+        uint256 loanId = _createActiveLoan();
+
+        vm.warp(block.timestamp + DURATION + 1);
+        loanManager.markDefault(loanId);
+
+        assertEq(token.balanceOf(lender), STARTING_BALANCE - LOAN_AMOUNT + COLLATERAL_AMOUNT);
+        assertEq(token.balanceOf(address(escrow)), 0);
+    }
+
+    function test_Custody_RejectionRefundsCollateral() public {
+        uint256 loanId = _requestLoan();
+
+        vm.prank(operator);
+        loanManager.rejectLoan(loanId);
+
+        assertEq(token.balanceOf(borrower), STARTING_BALANCE);
+    }
+
+    function test_Custody_CancellationRefundsCollateral() public {
+        uint256 loanId = _requestLoan();
+
+        vm.prank(borrower);
+        loanManager.cancelLoan(loanId);
+
+        assertEq(token.balanceOf(borrower), STARTING_BALANCE);
+    }
+
+    function test_Custody_ExpiredApprovalCanBeCancelledForRefund() public {
+        uint256 loanId = _requestLoan();
+        _approveLoan(loanId);
+
+        vm.warp(block.timestamp + loanManager.APPROVAL_EXPIRY() + 1);
+
+        vm.prank(borrower);
+        loanManager.cancelLoan(loanId);
+
+        assertEq(uint256(loanManager.getLoanStatus(loanId)), uint256(ILoanManager.LoanStatus.CANCELLED));
+        assertEq(token.balanceOf(borrower), STARTING_BALANCE);
+    }
+
+    function test_CancelLoan_RevertWhileApprovalIsLive() public {
+        uint256 loanId = _requestLoan();
+        _approveLoan(loanId);
+
+        vm.expectRevert();
+        vm.prank(borrower);
+        loanManager.cancelLoan(loanId);
     }
 }

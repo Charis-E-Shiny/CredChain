@@ -45,7 +45,12 @@ contract LoanGovernanceTest is Test {
         // Grant approver roles
         governance.grantRole(governance.APPROVER_ROLE(), approver1);
         governance.grantRole(governance.APPROVER_ROLE(), approver2);
+        escrow.grantRole(escrow.OPERATOR_ROLE(), address(loanManager));
         vm.stopPrank();
+
+        deal(address(token), borrower, 100_000 * 1e18);
+        vm.prank(borrower);
+        token.approve(address(escrow), type(uint256).max);
     }
 
     function test_StandardLoan_SingleApprovalSucceeds() public {

@@ -210,12 +210,21 @@ export function useCredChain() {
   ): Promise<`0x${string}`> => {
     setInternalWritePending(true);
     try {
-      return await executeContractWithFallback({
+      const hash = await executeContractWithFallback({
         params: writeParams,
         role,
         isConnected,
         writeContractAsync,
       });
+      // Wait for mining: approve -> transfer flows depend on the earlier tx, and
+      // balances refetched by callers must reflect this one.
+      if (publicClient) {
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        if (receipt.status === "reverted") {
+          throw new Error(`Transaction reverted on-chain: ${writeParams.functionName} (${hash})`);
+        }
+      }
+      return hash;
     } finally {
       setInternalWritePending(false);
     }
@@ -335,19 +344,22 @@ export function useCredChain() {
   };
 
   // Fetch outstanding balance on any active loan
-  const getLoanOutstanding = async (loanId: bigint): Promise<bigint> => {
-    if (!publicClient) return BigInt(0);
-    try {
-      return await publicClient.readContract({
-        address: contracts.loanManager,
-        abi: LoanManagerABI,
-        functionName: "getOutstandingBalance",
-        args: [loanId],
-      });
-    } catch {
-      return BigInt(0);
-    }
-  };
+  const getLoanOutstanding = useCallback(
+    async (loanId: bigint): Promise<bigint> => {
+      if (!publicClient) return BigInt(0);
+      try {
+        return await publicClient.readContract({
+          address: contracts.loanManager,
+          abi: LoanManagerABI,
+          functionName: "getOutstandingBalance",
+          args: [loanId],
+        });
+      } catch {
+        return BigInt(0);
+      }
+    },
+    [publicClient]
+  );
 
   return {
     address: effectiveAddress,

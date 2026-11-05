@@ -117,6 +117,11 @@ contract CredChainEndToEndIntegrationTest is Test {
         // Step 5: Loan is now REPAID and reputation score updated to 100
         assertEq(uint256(loanManager.getLoanStatus(loanId)), uint256(ILoanManager.LoanStatus.REPAID));
         assertEq(reputation.getReputationScore(borrower), 100);
+
+        // Step 6: Tokens settled: lender earned 50 interest, borrower has collateral back
+        assertEq(credToken.balanceOf(lender), 10050 * 1e18);
+        assertEq(credToken.balanceOf(borrower), 4950 * 1e18);
+        assertEq(credToken.balanceOf(address(escrow)), 0);
     }
 
     /**
@@ -154,5 +159,10 @@ contract CredChainEndToEndIntegrationTest is Test {
 
         // Reputation reflects default (0% repaid -> score 0)
         assertEq(reputation.getReputationScore(borrower), 0);
+
+        // Lender recovers the seized collateral; borrower keeps the principal
+        assertEq(credToken.balanceOf(lender), 9200 * 1e18);
+        assertEq(credToken.balanceOf(borrower), 5800 * 1e18);
+        assertEq(credToken.balanceOf(address(escrow)), 0);
     }
 }

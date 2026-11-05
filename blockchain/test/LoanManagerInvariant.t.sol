@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
+import "../src/CredToken.sol";
+import "../src/LoanEscrow.sol";
 import "../src/LoanManager.sol";
 import "../src/interfaces/ILoanManager.sol";
 
@@ -41,7 +43,8 @@ contract LoanManagerHandler is Test {
                 || to == ILoanManager.LoanStatus.CANCELLED;
         }
         if (from == ILoanManager.LoanStatus.APPROVED) {
-            return to == ILoanManager.LoanStatus.ACTIVE;
+            // CANCELLED only once the approval has expired unfunded
+            return to == ILoanManager.LoanStatus.ACTIVE || to == ILoanManager.LoanStatus.CANCELLED;
         }
         if (from == ILoanManager.LoanStatus.ACTIVE) {
             return to == ILoanManager.LoanStatus.REPAID || to == ILoanManager.LoanStatus.DEFAULTED;
@@ -154,19 +157,23 @@ contract LoanManagerHandler is Test {
 contract LoanManagerInvariantTest is Test {
     LoanManager internal loanManager;
     LoanManagerHandler internal handler;
+    CredToken internal token;
+    LoanEscrow internal escrow;
 
     address internal admin = makeAddr("admin");
     address internal operator = makeAddr("operator");
     address internal lender = makeAddr("lender");
 
     function setUp() public {
-        address escrow = makeAddr("escrow");
         address governance = makeAddr("governance");
 
         vm.startPrank(admin);
+        token = new CredToken(admin);
+        escrow = new LoanEscrow(address(token), admin);
         loanManager = new LoanManager(admin);
-        loanManager.setContracts(escrow, governance, address(0));
+        loanManager.setContracts(address(escrow), governance, address(0));
         loanManager.grantRole(loanManager.OPERATOR_ROLE(), operator);
+        escrow.grantRole(escrow.OPERATOR_ROLE(), address(loanManager));
         vm.stopPrank();
 
         address[] memory borrowers = new address[](3);
@@ -174,8 +181,19 @@ contract LoanManagerInvariantTest is Test {
         borrowers[1] = makeAddr("borrower1");
         borrowers[2] = makeAddr("borrower2");
 
+        _fund(lender);
+        _fund(borrowers[0]);
+        _fund(borrowers[1]);
+        _fund(borrowers[2]);
+
         handler = new LoanManagerHandler(loanManager, operator, lender, borrowers);
         targetContract(address(handler));
+    }
+
+    function _fund(address account) internal {
+        deal(address(token), account, 1e30);
+        vm.prank(account);
+        token.approve(address(escrow), type(uint256).max);
     }
 
     /// @dev Every status change follows the documented state machine.
@@ -220,6 +238,8 @@ contract LoanManagerInvariantTest is Test {
  */
 contract LoanManagerBpsMathTest is Test {
     LoanManager internal loanManager;
+    CredToken internal token;
+    LoanEscrow internal escrow;
 
     address internal admin = makeAddr("admin");
     address internal operator = makeAddr("operator");
@@ -227,15 +247,26 @@ contract LoanManagerBpsMathTest is Test {
     address internal borrower = makeAddr("borrower");
     bytes32 internal constant RISK_HASH = keccak256("bps-math");
 
+    function _fund(address account) internal {
+        deal(address(token), account, 1e30);
+        vm.prank(account);
+        token.approve(address(escrow), type(uint256).max);
+    }
+
     function setUp() public {
-        address escrow = makeAddr("escrow");
         address governance = makeAddr("governance");
 
         vm.startPrank(admin);
+        token = new CredToken(admin);
+        escrow = new LoanEscrow(address(token), admin);
         loanManager = new LoanManager(admin);
-        loanManager.setContracts(escrow, governance, address(0));
+        loanManager.setContracts(address(escrow), governance, address(0));
         loanManager.grantRole(loanManager.OPERATOR_ROLE(), operator);
+        escrow.grantRole(escrow.OPERATOR_ROLE(), address(loanManager));
         vm.stopPrank();
+
+        _fund(lender);
+        _fund(borrower);
     }
 
     function _requestAndActivate(uint256 amount, uint256 duration, uint256 bps) internal returns (uint256 id) {
@@ -297,8 +328,8 @@ contract LoanManagerBpsMathTest is Test {
         assertEq(loanManager.getOutstandingBalance(shortLoan), loanManager.getOutstandingBalance(longLoan));
     }
 
-    /// @notice KnownGap: an APPROVED loan whose approval has expired never leaves APPROVED,
-    ///         and it still counts toward the borrower's active-loan cap.
+    /// @notice KnownGap: an APPROVED loan whose approval has expired stays APPROVED until the
+    ///         borrower cancels it, and it still counts toward the active-loan cap until then.
     function test_KnownGap_ExpiredApprovalStuckAndCountsTowardCap() public {
         uint256 max = loanManager.MAX_ACTIVE_LOANS_PER_BORROWER();
         uint256[] memory ids = new uint256[](max);
@@ -317,7 +348,7 @@ contract LoanManagerBpsMathTest is Test {
         vm.prank(lender);
         loanManager.activateLoan(ids[0]);
 
-        // ...and remains APPROVED with no transition out of that state.
+        // ...and remains APPROVED unless the borrower cancels it.
         assertEq(uint256(loanManager.getLoanStatus(ids[0])), uint256(ILoanManager.LoanStatus.APPROVED));
 
         // It still blocks the borrower's next request.

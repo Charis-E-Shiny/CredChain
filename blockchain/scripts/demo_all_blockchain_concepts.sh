@@ -152,6 +152,7 @@ TOTAL_BEFORE=$(cast call "$LOAN_MANAGER" "getTotalLoans()(uint256)" --rpc-url "$
 RISK_HASH="0x"$(openssl rand -hex 32 2>/dev/null || echo "1111111111111111111111111111111111111111111111111111111111111111")
 
 echo -e "  ${YELLOW}Action:${RESET} Borrower creates Loan Request (1,000 CRED principal, 500 CRED collateral, 30 days, 5% interest)..."
+cast send "$CRED_TOKEN" "approve(address,uint256)" "$LOAN_ESCROW" 500000000000000000000 --private-key "$BORROWER_KEY" --rpc-url "$RPC_URL" > /dev/null
 OUT_REQ=$(cast send "$LOAN_MANAGER" "requestLoan(uint256,uint256,uint256,uint256,bytes32)" 1000000000000000000000 500000000000000000000 2592000 500 "$RISK_HASH" --private-key "$BORROWER_KEY" --rpc-url "$RPC_URL")
 record_tx "LoanManager.requestLoan(...)" "$OUT_REQ"
 
@@ -179,6 +180,7 @@ subheading "5" "Non-Custodial Escrow & Liquidity Activation (LoanEscrow.sol & Lo
 
 echo -e "  ${YELLOW}Action:${RESET} Lender mints CRED and activates Loan #${TARGET_LOAN_ID} on Marketplace..."
 cast send "$CRED_TOKEN" "faucet(uint256)" 1000000000000000000000 --private-key "$LENDER_KEY" --rpc-url "$RPC_URL" > /dev/null
+cast send "$CRED_TOKEN" "approve(address,uint256)" "$LOAN_ESCROW" 1000000000000000000000 --private-key "$LENDER_KEY" --rpc-url "$RPC_URL" > /dev/null
 OUT_ACTIVATE=$(cast send "$LOAN_MANAGER" "activateLoan(uint256)" "$TARGET_LOAN_ID" --private-key "$LENDER_KEY" --rpc-url "$RPC_URL")
 record_tx "LoanManager.activateLoan(#${TARGET_LOAN_ID})" "$OUT_ACTIVATE"
 

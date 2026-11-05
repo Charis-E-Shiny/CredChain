@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
-import { parseEther } from "viem";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { formatEther, parseEther } from "viem";
 import { useAccount, useConnect } from "wagmi";
 import { useCredChain } from "@/hooks/useCredChain";
 import { formatTokenAmount, shortenAddress } from "@/lib/utils";
@@ -50,6 +50,8 @@ function RepaymentContent() {
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mintingCred, setMintingCred] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const paramApplied = useRef(false);
 
   // Filter all on-chain loans that are currently in ACTIVE status (2)
   const allActiveLoans = allLoans.filter((l) => l.status === 2);
@@ -103,11 +105,13 @@ function RepaymentContent() {
 
   // Determine initial selected loan: prioritize URL param if valid, or first available active loan
   useEffect(() => {
-    if (paramLoanId) {
-      const match = allLoans.find((l) => l.id.toString() === paramLoanId);
+    // Apply the URL param once, so it doesn't override later manual selections
+    if (paramLoanId && !paramApplied.current) {
+      const match = allActiveLoans.find((l) => l.id.toString() === paramLoanId);
       if (match) {
+        paramApplied.current = true;
         setSelectedLoanId(paramLoanId);
-        if (myActiveLoans.length === 0 && allActiveLoans.length > 0) {
+        if (!myActiveLoans.some((l) => l.id === match.id)) {
           setActiveTab("all");
         }
         return;
@@ -127,15 +131,23 @@ function RepaymentContent() {
 
   // Fetch outstanding balance whenever selected loan changes
   useEffect(() => {
-    if (selectedLoanId) {
-      setLoadingBalance(true);
-      getLoanOutstanding(BigInt(selectedLoanId))
-        .then((bal) => {
-          setOutstandingWei(bal);
-          setAmount(formatTokenAmount(bal));
-        })
-        .finally(() => setLoadingBalance(false));
-    }
+    if (!selectedLoanId) return;
+
+    let stale = false;
+    setLoadingBalance(true);
+    getLoanOutstanding(BigInt(selectedLoanId))
+      .then((bal) => {
+        if (stale) return;
+        setOutstandingWei(bal);
+        setAmount(formatEther(bal));
+      })
+      .finally(() => {
+        if (!stale) setLoadingBalance(false);
+      });
+
+    return () => {
+      stale = true;
+    };
   }, [selectedLoanId, getLoanOutstanding]);
 
   // Find the currently selected loan record
@@ -181,10 +193,17 @@ function RepaymentContent() {
 
     setError(null);
     setStatusMsg(null);
+    setSubmitting(true);
 
     try {
       const repayWei = parseEther(amount);
       const lId = BigInt(selectedLoanId);
+
+      if (repayWei > outstandingWei) {
+        throw new Error(
+          `Repayment exceeds the outstanding balance of ${formatEther(outstandingWei)} CRED.`
+        );
+      }
 
       // Check balance
       if (credBalance !== undefined && credBalance < repayWei) {
@@ -207,9 +226,15 @@ function RepaymentContent() {
         `Repayment confirmed on-chain! Loan #${selectedLoanId} updated. Transaction: ${hash}`
       );
       await fetchAllLoans();
+
+      const remaining = await getLoanOutstanding(lId);
+      setOutstandingWei(remaining);
+      setAmount(formatEther(remaining));
     } catch (err: any) {
       setError(err?.shortMessage || err?.message || "Repayment transaction failed.");
       setStatusMsg(null);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -321,7 +346,7 @@ function RepaymentContent() {
                   const isMine = userAddrLower && l.borrower.toLowerCase() === userAddrLower;
                   return (
                     <option key={l.id.toString()} value={l.id.toString()}>
-                      Loan #{l.id.toString()} — {isMine ? "👤 Mine" : `Borrower: ${shortenAddress(l.borrower)}`} | Principal: {formatTokenAmount(l.principal)} CRED | APR:{" "}
+                      Loan #{l.id.toString()} — {isMine ? "👤 Mine" : `Borrower: ${shortenAddress(l.borrower)}`} | Principal: {formatTokenAmount(l.principal)} CRED | Interest:{" "}
                       {(l.interestRateBps / 100).toFixed(1)}% | Deadline:{" "}
                       {new Date(Number(l.repaymentDeadline) * 1000).toLocaleDateString()}
                     </option>
@@ -390,7 +415,7 @@ function RepaymentContent() {
                   </div>
                 </div>
                 <div className="col-span-2 sm:col-span-4 border-t pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                  <div className="text-muted-foreground">Total Repayment Balance Outstanding (Principal + 5% Interest):</div>
+                  <div className="text-muted-foreground">Total Repayment Balance Outstanding (Principal + {(selectedLoan.interestRateBps / 100).toFixed(2)}% Interest):</div>
                   <div className="font-mono font-extrabold text-base text-amber-500">
                     {loadingBalance ? "Calculating on-chain..." : `${formatTokenAmount(outstandingWei)} CRED`}
                   </div>
@@ -432,7 +457,7 @@ function RepaymentContent() {
                 />
                 <button
                   type="button"
-                  onClick={() => setAmount(formatTokenAmount(outstandingWei))}
+                  onClick={() => setAmount(formatEther(outstandingWei))}
                   className="absolute right-2.5 top-2 px-2.5 py-0.5 rounded text-[11px] font-bold bg-primary/20 text-primary hover:bg-primary/30 transition-colors"
                 >
                   Pay in Full
@@ -481,10 +506,10 @@ function RepaymentContent() {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isWritePending || !selectedLoanId || !isBorrowerMatch}
+              disabled={isWritePending || submitting || !selectedLoanId || !isBorrowerMatch}
               className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-bold text-xs hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50 shadow-md shadow-primary/20"
             >
-              {isWritePending ? (
+              {isWritePending || submitting ? (
                 <>
                   <RotateCcw className="h-4 w-4 animate-spin" />
                   Confirming in MetaMask...
