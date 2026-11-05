@@ -27,7 +27,7 @@ interface PastAssessment {
 }
 
 export default function ApplyLoanPage() {
-  const { address, isConnected, isDemoMode, credBalance, oraclePrice, requestLoan, approveToken, isWritePending } = useCredChain();
+  const { address, isConnected, isDemoMode, credBalance, oraclePrice, requestLoan, approveToken, requestFaucet, isWritePending } = useCredChain();
 
   const [amount, setAmount] = useState("1000");
   const [collateral, setCollateral] = useState("200");
@@ -41,6 +41,19 @@ export default function ApplyLoanPage() {
   const [txHash, setTxHash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<"form" | "approving" | "requesting" | "done">("form");
+  const [mintingCred, setMintingCred] = useState(false);
+
+  const handleMintCollateral = async () => {
+    setMintingCred(true);
+    setError(null);
+    try {
+      await requestFaucet("1000");
+    } catch (e: any) {
+      setError(e?.shortMessage || e?.message || "Failed to mint CRED tokens in MetaMask.");
+    } finally {
+      setMintingCred(false);
+    }
+  };
 
   // Fetch real assessment and verification status for connected wallet
   useEffect(() => {
@@ -285,9 +298,19 @@ export default function ApplyLoanPage() {
               <label className="font-bold uppercase tracking-wider text-muted-foreground">
                 Collateral Deposit (CRED)
               </label>
-              <span className="text-muted-foreground text-[11px]">
-                Available: <span className="font-mono text-foreground">{formatTokenAmount(credBalance)} CRED</span>
-              </span>
+              <div className="flex items-center gap-2 text-muted-foreground text-[11px]">
+                <span>Available:</span>
+                <span className="font-mono text-foreground font-semibold">{formatTokenAmount(credBalance)} CRED</span>
+                <button
+                  type="button"
+                  onClick={handleMintCollateral}
+                  disabled={mintingCred}
+                  className="font-bold text-primary hover:underline flex items-center gap-1"
+                >
+                  <RotateCcw className={`h-3 w-3 ${mintingCred ? "animate-spin" : ""}`} />
+                  {mintingCred ? "Minting..." : "+ Mint CRED"}
+                </button>
+              </div>
             </div>
             <div className="relative">
               <input

@@ -84,40 +84,48 @@ export default function GovernancePage() {
       </div>
 
       {/* Signer Mode Banner */}
-      <div className="p-3.5 rounded-xl border bg-card/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+      <div className="p-4 rounded-xl border bg-card/60 backdrop-blur flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-sm">
         <div className="flex items-center gap-2.5">
           {isConnected ? (
             <>
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-muted-foreground">Signer Mode:</span>
-              <span className="font-semibold text-foreground flex items-center gap-1.5">
-                <ShieldCheck className="h-4 w-4 text-emerald-500" />
-                MetaMask / Web3 Wallet ({shortenAddress(realAddress || address || "")})
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <span className="text-muted-foreground">Governance Signer:</span>
+              <span className="font-semibold text-foreground flex items-center gap-1.5 font-mono">
+                <ShieldCheck className="h-4 w-4 text-emerald-500 shrink-0" />
+                MetaMask Connected ({shortenAddress(realAddress || address || "")})
+              </span>
+              <span className="text-[11px] text-muted-foreground hidden lg:inline">
+                — Governance approvals execute interactively via MetaMask
               </span>
             </>
           ) : (
             <>
-              <span className="h-2.5 w-2.5 rounded-full bg-primary" />
-              <span className="text-muted-foreground">Signer Mode:</span>
+              <span className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+              <span className="text-muted-foreground">Wallet Status:</span>
               <span className="font-semibold text-foreground flex items-center gap-1.5">
-                <Zap className="h-4 w-4 text-primary" />
-                Direct Local Governance Signer (0xf39Fd6... Approver)
+                <AlertCircle className="h-4 w-4 text-amber-500 shrink-0" />
+                MetaMask Not Connected
               </span>
-              <span className="text-[11px] text-muted-foreground hidden md:inline">
-                — Ready to sign on local node
+              <span className="text-[11px] text-muted-foreground hidden sm:inline">
+                — Connect your Admin Web3 wallet (Account 0: 0xf39Fd6...) to sign governance proposals
               </span>
             </>
           )}
         </div>
 
-        {!isConnected && (
+        {!isConnected ? (
           <button
             onClick={handleConnectWallet}
-            className="px-3 py-1.5 rounded-lg border text-xs font-semibold hover:bg-muted transition-colors flex items-center gap-1.5 shrink-0"
+            className="px-3.5 py-1.5 rounded-xl border border-primary/30 bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-all flex items-center gap-1.5 shrink-0 shadow-sm"
           >
             <Wallet className="h-3.5 w-3.5 text-primary" />
-            Connect Browser Wallet (Optional)
+            Connect MetaMask Wallet
           </button>
+        ) : (
+          <div className="text-[11px] font-mono text-emerald-600 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20 flex items-center gap-1">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            <span>Interactive MetaMask Active</span>
+          </div>
         )}
       </div>
 

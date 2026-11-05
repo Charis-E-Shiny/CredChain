@@ -7,10 +7,13 @@ import { formatTokenAmount, shortenAddress, loanStatusLabels, loanStatusColors }
 import { Layers, FilePlus2, Receipt, ArrowLeft, CheckCircle2 } from "lucide-react";
 
 export default function BorrowerLoansPage() {
-  const { borrowerLoans, loadingLoans } = useCredChain();
+  const { borrowerLoans, allLoans, loadingLoans } = useCredChain();
   const [filter, setFilter] = useState<string>("ALL");
+  const [scope, setScope] = useState<"mine" | "all">("mine");
 
-  const filteredLoans = borrowerLoans.filter((loan) => {
+  const sourceLoans = scope === "mine" && borrowerLoans.length > 0 ? borrowerLoans : allLoans;
+
+  const filteredLoans = sourceLoans.filter((loan) => {
     if (filter === "ALL") return true;
     if (filter === "ACTIVE") return loan.status === 2;
     if (filter === "PENDING") return loan.status === 0 || loan.status === 1;
@@ -45,26 +48,47 @@ export default function BorrowerLoansPage() {
         </Link>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs font-semibold">
-        {["ALL", "ACTIVE", "PENDING", "REPAID", "DEFAULTED"].map((tab) => (
+      {/* Filter Tabs & Scope Toggle */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-semibold">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          {["ALL", "ACTIVE", "PENDING", "REPAID", "DEFAULTED"].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setFilter(tab)}
+              className={`px-3 py-1.5 rounded-lg border transition-colors ${
+                filter === tab
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-card text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-1 p-0.5 rounded-lg border bg-muted/30 self-start sm:self-auto">
           <button
-            key={tab}
-            onClick={() => setFilter(tab)}
-            className={`px-3 py-1.5 rounded-lg border transition-colors ${
-              filter === tab
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-card text-muted-foreground hover:bg-muted"
+            onClick={() => setScope("mine")}
+            className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+              scope === "mine" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            {tab}
+            My Loans ({borrowerLoans.length})
           </button>
-        ))}
+          <button
+            onClick={() => setScope("all")}
+            className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+              scope === "all" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            All Protocol Loans ({allLoans.length})
+          </button>
+        </div>
       </div>
 
       {/* Table */}
       <div className="p-6 rounded-2xl border bg-card/60 backdrop-blur shadow-sm space-y-4">
-        {loadingLoans ? (
+        {loadingLoans && filteredLoans.length === 0 ? (
           <div className="p-8 text-center text-xs text-muted-foreground">Loading on-chain records...</div>
         ) : filteredLoans.length === 0 ? (
           <div className="p-12 text-center text-xs text-muted-foreground">
@@ -76,6 +100,7 @@ export default function BorrowerLoansPage() {
               <thead className="border-b text-muted-foreground uppercase font-semibold">
                 <tr>
                   <th className="py-3 px-3">Loan ID</th>
+                  <th className="py-3 px-3">Borrower</th>
                   <th className="py-3 px-3">Principal</th>
                   <th className="py-3 px-3">Collateral</th>
                   <th className="py-3 px-3">Yield (APR)</th>
@@ -89,6 +114,7 @@ export default function BorrowerLoansPage() {
                 {filteredLoans.map((loan) => (
                   <tr key={loan.id.toString()} className="hover:bg-muted/20">
                     <td className="py-3 px-3 font-mono font-bold">#{loan.id.toString()}</td>
+                    <td className="py-3 px-3 font-mono text-muted-foreground">{shortenAddress(loan.borrower)}</td>
                     <td className="py-3 px-3 font-semibold">{formatTokenAmount(loan.principal)} CRED</td>
                     <td className="py-3 px-3 font-mono text-muted-foreground">{formatTokenAmount(loan.collateralAmount)} CRED</td>
                     <td className="py-3 px-3 font-semibold text-emerald-400">
@@ -113,8 +139,9 @@ export default function BorrowerLoansPage() {
                       {loan.status === 2 ? (
                         <Link
                           href={`/repayment?loanId=${loan.id.toString()}`}
-                          className="px-2.5 py-1 rounded-lg bg-primary text-primary-foreground font-semibold hover:opacity-90"
+                          className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1 shadow-sm transition-colors"
                         >
+                          <Receipt className="h-3 w-3" />
                           Repay
                         </Link>
                       ) : loan.status === 3 ? (
