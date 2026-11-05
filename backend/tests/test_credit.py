@@ -5,11 +5,11 @@ Pytest test suite for CredChain FastAPI endpoints and ML credit risk assessment.
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
-from app.database.connection import Base, engine
+from app.database.connection import create_schema
 from app.services.prediction_service import load_model
 
 # Ensure tables exist and model is loaded for test session
-Base.metadata.create_all(bind=engine)
+create_schema()
 load_model()
 
 

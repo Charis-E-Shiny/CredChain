@@ -15,7 +15,7 @@ from app.api.loans import router as loans_router
 from app.api.passport import router as passport_router
 from app.api.users import router as users_router
 from app.api.verification import router as verification_router
-from app.database.connection import Base, engine
+from app.database.connection import Base, create_schema, engine
 from app.services.prediction_service import is_model_loaded, load_model
 
 logging.basicConfig(
@@ -29,7 +29,7 @@ logger = logging.getLogger("credchain")
 async def lifespan(app: FastAPI):
     # Startup: Initialize database tables
     logger.info("Initializing database schema...")
-    Base.metadata.create_all(bind=engine)
+    create_schema()
 
     # Startup: Load ML model artifacts
     logger.info("Attempting to load trained credit model...")

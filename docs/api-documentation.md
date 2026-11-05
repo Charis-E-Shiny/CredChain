@@ -78,6 +78,28 @@ Base URL: `http://localhost:8000/api`
 
 ---
 
+### 3a. Assessment Integrity and Verification
+
+Each assessment is bound to a tamper-evident hash:
+
+- **Standing:** the borrower's verification status is applied to the model's raw score by `apply_verification_standing` in `backend/app/services/scoring_service.py`. Strong verification lowers the score; a discrepancy raises it.
+- **Hash:** `assessment_hash` is a bytes32 SHA-256 over the features, raw and final scores, confidence, verification status, verification record hash, model version, and timestamp, with keys sorted. The loan request commits this value on-chain as `riskAssessmentHash`.
+- **Re-scoring:** when verification status changes (document evaluation, document deletion, or admin review), the backend writes a new assessment with the current standing. Earlier assessments are kept as history and marked stale by the verify endpoint.
+
+#### `GET /api/credit/verify/{assessment_id}`
+
+Checks a stored assessment and returns independent checks:
+
+| Field | Meaning |
+|---|---|
+| `valid` | `hash_matches` and `score_consistent` (and `matches_onchain`, when supplied) |
+| `stale` | the borrower's status or verification record has changed since the assessment |
+| `checks.hash_matches` | stored hash equals the hash recomputed from stored fields |
+| `checks.score_consistent` | stored score equals the standing applied to the raw score |
+| `checks.matches_onchain` | present only with `?onchain_hash=0x...`; compares the on-chain commitment |
+
+Assessments created before the integrity fields existed return `valid: false` with a reason and cannot be verified.
+
 ### 4. Loan Indexing
 `GET /api/loans`
 - **Query Parameters**: `page` (default 1), `page_size` (default 10), `wallet` (optional).

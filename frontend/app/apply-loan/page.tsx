@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { parseEther, keccak256, toHex } from "viem";
+import { parseEther } from "viem";
 import { useCredChain } from "@/hooks/useCredChain";
 import { contracts, chainConfig } from "@/config/contracts";
 import { formatTokenAmount } from "@/lib/utils";
@@ -19,11 +19,13 @@ import {
 import Link from "next/link";
 
 interface PastAssessment {
-  id: string;
+  assessment_id: string;
   risk_score: number;
   risk_category: string;
   confidence: number;
   created_at: string;
+  verification_status?: string | null;
+  assessment_hash?: string | null;
 }
 
 export default function ApplyLoanPage() {
@@ -107,6 +109,12 @@ export default function ApplyLoanPage() {
       return;
     }
 
+    // The on-chain riskAssessmentHash must commit to a real, hashed assessment.
+    if (!recentAssessment?.assessment_hash) {
+      setError("Run a credit assessment before applying. The loan request must commit to an assessment hash.");
+      return;
+    }
+
     setError(null);
 
     try {
@@ -115,9 +123,10 @@ export default function ApplyLoanPage() {
       const durSecs = BigInt(parseInt(durationDays) * 86400);
       const rateBps = BigInt(interestRateBps);
 
-      // Use real assessment ID if available, otherwise deterministic wallet-salt hash
-      const assessmentRef = recentAssessment ? recentAssessment.id : `OFFCHAIN-CONSENTED-${address}`;
-      const riskHash = keccak256(toHex(assessmentRef));
+      // Commit to the latest assessment's bytes32 hash. The backend hashes the inputs,
+      // score, verification standing, and verification record, so this value can be
+      // re-verified later against the stored assessment.
+      const riskHash = recentAssessment.assessment_hash as `0x${string}`;
 
       // Step 1: Approve escrow for collateral tokens
       await approveToken(contracts.loanEscrow, colWei);
@@ -171,7 +180,10 @@ export default function ApplyLoanPage() {
         {recentAssessment ? (
           <div className="text-xs text-muted-foreground space-y-1">
             <p>
-              Referencing Assessment ID: <span className="font-mono text-foreground font-semibold">{recentAssessment.id.slice(0, 18)}...</span>
+              Referencing Assessment ID: <span className="font-mono text-foreground font-semibold">{recentAssessment.assessment_id.slice(0, 18)}...</span>
+            </p>
+            <p>
+              Committed hash: <span className="font-mono text-foreground">{(recentAssessment.assessment_hash ?? "").slice(0, 18)}...</span>
             </p>
             <p className="text-[11px] text-muted-foreground">
               Risk Score: {recentAssessment.risk_score.toFixed(3)} | Confidence: {(recentAssessment.confidence * 100).toFixed(1)}% | Completed: {new Date(recentAssessment.created_at).toLocaleDateString()}
@@ -179,7 +191,7 @@ export default function ApplyLoanPage() {
           </div>
         ) : (
           <div className="text-xs text-muted-foreground flex items-center justify-between gap-2 pt-1">
-            <span>No prior AI assessment found for this wallet. Standard baseline scoring will apply.</span>
+            <span>No AI assessment found for this wallet. Run an assessment before applying; the loan commits to its hash.</span>
             <Link href="/credit-assessment" className="text-primary font-semibold hover:underline shrink-0">
               Run Assessment &rarr;
             </Link>

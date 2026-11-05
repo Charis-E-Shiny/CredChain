@@ -150,7 +150,7 @@ export default function MergedAssessmentVerificationPage() {
             contributing_factors: [],
             eligibility: `Loaded previous assessment (${latest.risk_category} Risk)`,
             model_version: "1.0.0",
-            assessment_id: latest.id,
+            assessment_id: latest.assessment_id,
             timestamp: latest.created_at,
             disclaimer: "Academic prototype only.",
           });

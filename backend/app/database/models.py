@@ -29,6 +29,15 @@ class CreditAssessment(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     consent_given = Column(Boolean, default=False)
 
+    # Integrity fields (added for verification-aware scoring and tamper evidence).
+    raw_risk_score = Column(Float, nullable=True)          # model output before verification standing
+    raw_confidence = Column(Float, nullable=True)          # model confidence before verification standing
+    verification_status = Column(String, nullable=True)    # standing this score was computed under
+    verification_record_hash = Column(String, nullable=True)  # hash of the verification record used
+    verification_adjustment = Column(Float, nullable=True)  # signed delta applied to the raw score
+    assessed_at = Column(String, nullable=True)            # ISO timestamp included in the hash
+    assessment_hash = Column(String, nullable=True, index=True)  # 0x bytes32 committed on-chain
+
 
 class LoanRecord(Base):
     """Tracks loan records linked to on-chain loan IDs."""
