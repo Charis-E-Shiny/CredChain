@@ -4,15 +4,47 @@ import { useState } from "react";
 import Link from "next/link";
 import { AdminGate } from "@/components/auth/AdminGate";
 import { useCredChain } from "@/hooks/useCredChain";
+import { useConnect } from "wagmi";
 import { formatTokenAmount, shortenAddress } from "@/lib/utils";
-import { FileCheck2, ArrowLeft, CheckCircle2, XCircle, AlertCircle, RotateCcw } from "lucide-react";
+import {
+  FileCheck2,
+  ArrowLeft,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  RotateCcw,
+  Wallet,
+  ShieldCheck,
+  Zap,
+} from "lucide-react";
 
 export default function LoanApprovalQueuePage() {
-  const { pendingApprovalLoans, loadingLoans, approveGovernance, rejectGovernance, isWritePending } = useCredChain();
+  const {
+    pendingApprovalLoans,
+    loadingLoans,
+    approveGovernance,
+    rejectGovernance,
+    isWritePending,
+    isConnected,
+    realAddress,
+    address,
+    fetchAllLoans,
+  } = useCredChain();
+
+  const { connect, connectors } = useConnect();
 
   const [actingId, setActingId] = useState<string | null>(null);
   const [txMsg, setTxMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const handleConnectWallet = () => {
+    const injected = connectors.find((c) => c.name === "MetaMask" || c.id === "injected");
+    if (injected) {
+      connect({ connector: injected });
+    } else if (connectors[0]) {
+      connect({ connector: connectors[0] });
+    }
+  };
 
   const handleApprove = async (loanId: bigint) => {
     setActingId(loanId.toString());
@@ -20,7 +52,8 @@ export default function LoanApprovalQueuePage() {
     setErrorMsg(null);
     try {
       const hash = await approveGovernance(loanId);
-      setTxMsg(`Loan #${loanId.toString()} approval submitted on-chain. Tx: ${hash}`);
+      setTxMsg(`Loan #${loanId.toString()} approved successfully on-chain! Tx: ${hash}`);
+      await fetchAllLoans();
     } catch (err: any) {
       setErrorMsg(err?.shortMessage || err?.message || "Approval transaction failed.");
     } finally {
@@ -35,6 +68,7 @@ export default function LoanApprovalQueuePage() {
     try {
       const hash = await rejectGovernance(loanId);
       setTxMsg(`Loan #${loanId.toString()} rejected. Collateral unlocked for borrower. Tx: ${hash}`);
+      await fetchAllLoans();
     } catch (err: any) {
       setErrorMsg(err?.shortMessage || err?.message || "Rejection transaction failed.");
     } finally {
@@ -47,7 +81,10 @@ export default function LoanApprovalQueuePage() {
       <div className="max-w-6xl mx-auto space-y-6 pb-12">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
           <div>
-            <Link href="/admin" className="text-xs text-primary hover:underline flex items-center gap-1 mb-2">
+            <Link
+              href="/admin"
+              className="text-xs text-primary hover:underline flex items-center gap-1 mb-2 font-medium"
+            >
               <ArrowLeft className="h-3.5 w-3.5" /> Back to Admin Overview
             </Link>
             <h1 className="text-2xl font-extrabold tracking-tight flex items-center gap-2">
@@ -55,17 +92,57 @@ export default function LoanApprovalQueuePage() {
               Loan Approval Queue
             </h1>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Review requested micro-loans and execute on-chain governance approvals or rejections.
+              Review borrower loan applications and execute on-chain governance approvals or rejections.
             </p>
           </div>
 
-          <span className="text-xs font-mono px-3 py-1 rounded-full bg-amber-500/15 text-amber-400 font-bold border border-amber-500/30">
-            {pendingApprovalLoans.length} Pending Approval
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-mono px-3 py-1 rounded-full bg-amber-500/15 text-amber-500 font-bold border border-amber-500/30">
+              {pendingApprovalLoans.length} Pending Approval
+            </span>
+          </div>
+        </div>
+
+        {/* Execution Mode Banner */}
+        <div className="p-3.5 rounded-xl border bg-card/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5">
+            {isConnected ? (
+              <>
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-muted-foreground">Signer Mode:</span>
+                <span className="font-semibold text-foreground flex items-center gap-1.5">
+                  <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                  MetaMask / Web3 Wallet ({shortenAddress(realAddress || address || "")})
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+                <span className="text-muted-foreground">Signer Mode:</span>
+                <span className="font-semibold text-foreground flex items-center gap-1.5">
+                  <Zap className="h-4 w-4 text-primary" />
+                  Direct Local Governance Signer (0xf39Fd6... Approver)
+                </span>
+                <span className="text-[11px] text-muted-foreground hidden md:inline">
+                  — Transactions execute seamlessly on local node
+                </span>
+              </>
+            )}
+          </div>
+
+          {!isConnected && (
+            <button
+              onClick={handleConnectWallet}
+              className="px-3 py-1.5 rounded-lg border text-xs font-semibold hover:bg-muted transition-colors flex items-center gap-1.5 shrink-0"
+            >
+              <Wallet className="h-3.5 w-3.5 text-primary" />
+              Connect Browser Wallet (Optional)
+            </button>
+          )}
         </div>
 
         {txMsg && (
-          <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs flex items-center gap-2">
+          <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 text-xs flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 shrink-0" />
             <span className="font-mono">{txMsg}</span>
           </div>
@@ -86,7 +163,7 @@ export default function LoanApprovalQueuePage() {
             </div>
           ) : pendingApprovalLoans.length === 0 ? (
             <div className="p-12 text-center rounded-xl border border-dashed bg-card/30 space-y-2">
-              <CheckCircle2 className="h-8 w-8 mx-auto text-emerald-400" />
+              <CheckCircle2 className="h-8 w-8 mx-auto text-emerald-500" />
               <div className="text-sm font-semibold">Approval Queue is Clear</div>
               <p className="text-xs text-muted-foreground max-w-sm mx-auto">
                 There are no pending loan requests requiring governance review. New requests from borrowers will appear here automatically.
@@ -113,14 +190,17 @@ export default function LoanApprovalQueuePage() {
                       <td className="py-3 px-3 font-mono font-bold text-primary">#{loan.id.toString()}</td>
                       <td className="py-3 px-3 font-mono">{shortenAddress(loan.borrower)}</td>
                       <td className="py-3 px-3 font-semibold">{formatTokenAmount(loan.principal)} CRED</td>
-                      <td className="py-3 px-3 font-mono text-sky-400 font-medium">
+                      <td className="py-3 px-3 font-mono text-sky-500 font-medium">
                         {formatTokenAmount(loan.collateralAmount)} CRED
                       </td>
-                      <td className="py-3 px-3 text-emerald-400 font-bold">
+                      <td className="py-3 px-3 text-emerald-600 font-bold">
                         {(loan.interestRateBps / 100).toFixed(1)}%
                       </td>
                       <td className="py-3 px-3">{Math.round(Number(loan.duration) / 86400)} Days</td>
-                      <td className="py-3 px-3 font-mono text-[11px] text-muted-foreground truncate max-w-[120px]" title={loan.riskAssessmentHash}>
+                      <td
+                        className="py-3 px-3 font-mono text-[11px] text-muted-foreground truncate max-w-[120px]"
+                        title={loan.riskAssessmentHash}
+                      >
                         {loan.riskAssessmentHash.slice(0, 10)}...
                       </td>
                       <td className="py-3 px-3 text-right">
@@ -128,16 +208,16 @@ export default function LoanApprovalQueuePage() {
                           <button
                             onClick={() => handleApprove(loan.id)}
                             disabled={isWritePending || actingId === loan.id.toString()}
-                            className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-500 disabled:opacity-50 transition-colors"
+                            className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-500 disabled:opacity-50 transition-colors shadow-sm"
                           >
-                            {actingId === loan.id.toString() ? "..." : "Approve"}
+                            {actingId === loan.id.toString() ? "Approving..." : "Approve"}
                           </button>
                           <button
                             onClick={() => handleReject(loan.id)}
                             disabled={isWritePending || actingId === loan.id.toString()}
                             className="px-3 py-1.5 rounded-lg border border-destructive/40 text-destructive hover:bg-destructive/10 font-semibold disabled:opacity-50 transition-colors"
                           >
-                            Reject
+                            {actingId === loan.id.toString() ? "Rejecting..." : "Reject"}
                           </button>
                         </div>
                       </td>

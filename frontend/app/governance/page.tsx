@@ -2,14 +2,43 @@
 
 import { useState } from "react";
 import { useCredChain } from "@/hooks/useCredChain";
-import { Vote, CheckCircle2, XCircle, AlertCircle, ShieldAlert } from "lucide-react";
+import { useConnect } from "wagmi";
+import { shortenAddress } from "@/lib/utils";
+import {
+  Vote,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  ShieldAlert,
+  ShieldCheck,
+  Zap,
+  Wallet,
+} from "lucide-react";
 
 export default function GovernancePage() {
-  const { isConnected, approveGovernance, rejectGovernance, isWritePending } = useCredChain();
+  const {
+    isConnected,
+    realAddress,
+    address,
+    approveGovernance,
+    rejectGovernance,
+    isWritePending,
+  } = useCredChain();
+
+  const { connect, connectors } = useConnect();
 
   const [loanId, setLoanId] = useState("0");
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const handleConnectWallet = () => {
+    const injected = connectors.find((c) => c.name === "MetaMask" || c.id === "injected");
+    if (injected) {
+      connect({ connector: injected });
+    } else if (connectors[0]) {
+      connect({ connector: connectors[0] });
+    }
+  };
 
   const handleApprove = async () => {
     try {
@@ -43,6 +72,44 @@ export default function GovernancePage() {
         <p className="text-sm text-muted-foreground mt-1">
           Module 3 — Multi-party authorization required before smart contracts disburse funds.
         </p>
+      </div>
+
+      {/* Signer Mode Banner */}
+      <div className="p-3.5 rounded-xl border bg-card/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2.5">
+          {isConnected ? (
+            <>
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-muted-foreground">Signer Mode:</span>
+              <span className="font-semibold text-foreground flex items-center gap-1.5">
+                <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                MetaMask / Web3 Wallet ({shortenAddress(realAddress || address || "")})
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+              <span className="text-muted-foreground">Signer Mode:</span>
+              <span className="font-semibold text-foreground flex items-center gap-1.5">
+                <Zap className="h-4 w-4 text-primary" />
+                Direct Local Governance Signer (0xf39Fd6... Approver)
+              </span>
+              <span className="text-[11px] text-muted-foreground hidden md:inline">
+                — Ready to sign on local node
+              </span>
+            </>
+          )}
+        </div>
+
+        {!isConnected && (
+          <button
+            onClick={handleConnectWallet}
+            className="px-3 py-1.5 rounded-lg border text-xs font-semibold hover:bg-muted transition-colors flex items-center gap-1.5 shrink-0"
+          >
+            <Wallet className="h-3.5 w-3.5 text-primary" />
+            Connect Browser Wallet (Optional)
+          </button>
+        )}
       </div>
 
       {statusMsg && (
@@ -82,19 +149,19 @@ export default function GovernancePage() {
             <div className="flex gap-3 pt-2">
               <button
                 onClick={handleApprove}
-                disabled={isWritePending || !isConnected}
-                className="flex-1 py-2.5 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-500 disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5"
+                disabled={isWritePending}
+                className="flex-1 py-2.5 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-500 disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
               >
                 <CheckCircle2 className="h-4 w-4" />
-                Approve Loan
+                {isWritePending ? "Submitting..." : "Approve Loan"}
               </button>
               <button
                 onClick={handleReject}
-                disabled={isWritePending || !isConnected}
-                className="flex-1 py-2.5 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-500 disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5"
+                disabled={isWritePending}
+                className="flex-1 py-2.5 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-500 disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
               >
                 <XCircle className="h-4 w-4" />
-                Reject Loan
+                {isWritePending ? "Submitting..." : "Reject Loan"}
               </button>
             </div>
           </div>

@@ -13,6 +13,7 @@ function RepaymentContent() {
   const {
     address,
     isConnected,
+    isDemoMode,
     credBalance,
     borrowerLoans,
     loadingLoans,
@@ -67,8 +68,8 @@ function RepaymentContent() {
 
   const handleRepay = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isConnected || !selectedLoanId) {
-      setError("Please connect your wallet and select an active loan.");
+    if ((!isConnected && !isDemoMode) || !selectedLoanId) {
+      setError("Please connect your wallet or use Demo Mode and select an active loan.");
       return;
     }
 

@@ -3,14 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { AdminGate } from "@/components/auth/AdminGate";
-import { useAccount, useWriteContract } from "wagmi";
+import { useCredChain } from "@/hooks/useCredChain";
 import { contracts } from "@/config/contracts";
 import { LoanGovernanceABI, LoanManagerABI } from "@/abi/contracts";
 import { Users, ArrowLeft, ShieldCheck, CheckCircle2, AlertCircle, RotateCcw } from "lucide-react";
 
 export default function UserRoleManagementPage() {
-  const { address } = useAccount();
-  const { writeContractAsync, isPending } = useWriteContract();
+  const { executeWrite, isWritePending } = useCredChain();
 
   const [targetAccount, setTargetAccount] = useState("");
   const [selectedRole, setSelectedRole] = useState("APPROVER_ROLE");
@@ -30,7 +29,7 @@ export default function UserRoleManagementPage() {
     setActionStatus(null);
     try {
       const roleBytes = selectedRole === "APPROVER_ROLE" ? APPROVER_ROLE : LENDER_ROLE;
-      const hash = await writeContractAsync({
+      const hash = await executeWrite("admin", {
         address: contracts.loanGovernance,
         abi: LoanGovernanceABI,
         functionName: "grantRole",
@@ -107,10 +106,10 @@ export default function UserRoleManagementPage() {
 
             <button
               onClick={handleGrantRole}
-              disabled={isPending || !targetAccount}
+              disabled={isWritePending || !targetAccount}
               className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-xs hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center gap-2"
             >
-              {isPending ? (
+              {isWritePending ? (
                 <>
                   <RotateCcw className="h-4 w-4 animate-spin" />
                   Granting Role On-Chain...

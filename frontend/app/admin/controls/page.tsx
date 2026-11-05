@@ -3,19 +3,19 @@
 import { useState } from "react";
 import Link from "next/link";
 import { AdminGate } from "@/components/auth/AdminGate";
-import { useAccount, useWriteContract } from "wagmi";
+import { useCredChain } from "@/hooks/useCredChain";
 import { contracts } from "@/config/contracts";
 import { LoanManagerABI } from "@/abi/contracts";
 import { SlidersHorizontal, ArrowLeft, PauseCircle, PlayCircle, AlertTriangle, ShieldCheck } from "lucide-react";
 
 export default function ProtocolControlsPage() {
-  const { writeContractAsync, isPending } = useWriteContract();
+  const { executeWrite, isWritePending } = useCredChain();
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const handlePause = async () => {
     try {
       setFeedback(null);
-      const hash = await writeContractAsync({
+      const hash = await executeWrite("admin", {
         address: contracts.loanManager,
         abi: LoanManagerABI,
         functionName: "pause",
@@ -29,7 +29,7 @@ export default function ProtocolControlsPage() {
   const handleUnpause = async () => {
     try {
       setFeedback(null);
-      const hash = await writeContractAsync({
+      const hash = await executeWrite("admin", {
         address: contracts.loanManager,
         abi: LoanManagerABI,
         functionName: "unpause",
@@ -75,7 +75,7 @@ export default function ProtocolControlsPage() {
           <div className="flex items-center gap-4 pt-3">
             <button
               onClick={handlePause}
-              disabled={isPending}
+              disabled={isWritePending}
               className="px-5 py-2.5 rounded-xl bg-destructive text-destructive-foreground font-bold text-xs hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
             >
               <PauseCircle className="h-4 w-4" />
@@ -84,7 +84,7 @@ export default function ProtocolControlsPage() {
 
             <button
               onClick={handleUnpause}
-              disabled={isPending}
+              disabled={isWritePending}
               className="px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-500 disabled:opacity-50 flex items-center gap-2"
             >
               <PlayCircle className="h-4 w-4" />

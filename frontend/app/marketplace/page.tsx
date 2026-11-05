@@ -160,7 +160,7 @@ export default function MarketplacePage() {
                     <td className="py-3 px-3 text-right">
                       <button
                         onClick={() => handleFund(loan.id)}
-                        disabled={!isConnected || isWritePending || fundingId === loan.id.toString()}
+                        disabled={isWritePending || fundingId === loan.id.toString()}
                         className="px-3.5 py-1.5 rounded-xl bg-primary text-primary-foreground font-bold hover:opacity-90 transition-opacity disabled:opacity-50 shadow-sm"
                       >
                         {fundingId === loan.id.toString() ? "Funding..." : "Fund Loan"}

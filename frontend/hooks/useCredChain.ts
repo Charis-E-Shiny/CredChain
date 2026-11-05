@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAccount, useReadContract, useWriteContract, usePublicClient } from "wagmi";
+import { useRole } from "@/context/RoleContext";
 import { contracts } from "@/config/contracts";
 import {
   CredTokenABI,
@@ -10,6 +11,12 @@ import {
   BorrowerReputationABI,
   CollateralOracleABI,
 } from "@/abi/contracts";
+import {
+  executeContractWithFallback,
+  ANVIL_ACCOUNTS,
+  ContractRole,
+  WriteContractParams,
+} from "@/lib/contractExecution";
 import { parseEther } from "viem";
 
 export interface LoanItem {
@@ -32,17 +39,26 @@ export interface LoanItem {
 
 export function useCredChain() {
   const { address, isConnected, chain } = useAccount();
+  const { role: activeUserRole, isDemoMode } = useRole();
   const publicClient = usePublicClient();
+
+  // Effective address: connected wallet if available; else role-appropriate Anvil test account if demo mode
+  const effectiveAddress: `0x${string}` | undefined = address
+    ? address
+    : isDemoMode
+    ? ANVIL_ACCOUNTS[activeUserRole]?.address || ANVIL_ACCOUNTS.admin.address
+    : undefined;
 
   const [allLoans, setAllLoans] = useState<LoanItem[]>([]);
   const [loadingLoans, setLoadingLoans] = useState(false);
+  const [internalWritePending, setInternalWritePending] = useState(false);
 
   // Read CredToken balance
   const { data: credBalance, refetch: refetchBalance } = useReadContract({
     address: contracts.credToken,
     abi: CredTokenABI,
     functionName: "balanceOf",
-    args: address ? [address] : undefined,
+    args: effectiveAddress ? [effectiveAddress] : undefined,
   });
 
   // Read total loans
@@ -64,7 +80,7 @@ export function useCredChain() {
     address: contracts.loanManager,
     abi: LoanManagerABI,
     functionName: "getBorrowerLoans",
-    args: address ? [address] : undefined,
+    args: effectiveAddress ? [effectiveAddress] : undefined,
   });
 
   // Read borrower reputation
@@ -72,14 +88,14 @@ export function useCredChain() {
     address: contracts.borrowerReputation,
     abi: BorrowerReputationABI,
     functionName: "getReputationScore",
-    args: address ? [address] : undefined,
+    args: effectiveAddress ? [effectiveAddress] : undefined,
   });
 
   const { data: reputationRecord, refetch: refetchReputationRecord } = useReadContract({
     address: contracts.borrowerReputation,
     abi: BorrowerReputationABI,
     functionName: "getReputation",
-    args: address ? [address] : undefined,
+    args: effectiveAddress ? [effectiveAddress] : undefined,
   });
 
   // Read latest oracle price
@@ -89,8 +105,9 @@ export function useCredChain() {
     functionName: "getLatestPrice",
   });
 
-  // Write contract hook
-  const { writeContractAsync, isPending: isWritePending } = useWriteContract();
+  // Write contract hook from Wagmi
+  const { writeContractAsync, isPending: isWagmiPending } = useWriteContract();
+  const isWritePending = isWagmiPending || internalWritePending;
 
   // Load all on-chain loans dynamically
   const fetchAllLoans = useCallback(async () => {
@@ -170,7 +187,7 @@ export function useCredChain() {
   }, [fetchAllLoans, totalLoans]);
 
   // Derived filtered loan collections
-  const userAddrLower = address?.toLowerCase();
+  const userAddrLower = (effectiveAddress || address)?.toLowerCase();
 
   const borrowerLoans = allLoans.filter(
     (l) => userAddrLower && l.borrower.toLowerCase() === userAddrLower
@@ -186,9 +203,27 @@ export function useCredChain() {
   // Status 0: REQUESTED (Awaiting approval by governance/admin)
   const pendingApprovalLoans = allLoans.filter((l) => l.status === 0);
 
+  // Unified contract execution wrapper: uses Wagmi if connected, or local node fallback
+  const runWrite = async (
+    role: ContractRole,
+    writeParams: WriteContractParams
+  ): Promise<`0x${string}`> => {
+    setInternalWritePending(true);
+    try {
+      return await executeContractWithFallback({
+        params: writeParams,
+        role,
+        isConnected,
+        writeContractAsync,
+      });
+    } finally {
+      setInternalWritePending(false);
+    }
+  };
+
   // Faucet request
   const requestFaucet = async (amount: string = "1000") => {
-    const hash = await writeContractAsync({
+    const hash = await runWrite("borrower", {
       address: contracts.credToken,
       abi: CredTokenABI,
       functionName: "faucet",
@@ -199,8 +234,13 @@ export function useCredChain() {
   };
 
   // Approve token
-  const approveToken = async (spender: `0x${string}`, amount: bigint) => {
-    return await writeContractAsync({
+  const approveToken = async (
+    spender: `0x${string}`,
+    amount: bigint,
+    roleOverride?: ContractRole
+  ) => {
+    const targetRole = roleOverride || (activeUserRole === "lender" ? "lender" : "borrower");
+    return await runWrite(targetRole, {
       address: contracts.credToken,
       abi: CredTokenABI,
       functionName: "approve",
@@ -216,7 +256,7 @@ export function useCredChain() {
     interestBps: bigint,
     riskHash: `0x${string}`
   ) => {
-    const hash = await writeContractAsync({
+    const hash = await runWrite("borrower", {
       address: contracts.loanManager,
       abi: LoanManagerABI,
       functionName: "requestLoan",
@@ -230,7 +270,7 @@ export function useCredChain() {
 
   // Activate loan (Lender funding)
   const activateLoan = async (loanId: bigint) => {
-    const hash = await writeContractAsync({
+    const hash = await runWrite("lender", {
       address: contracts.loanManager,
       abi: LoanManagerABI,
       functionName: "activateLoan",
@@ -244,7 +284,7 @@ export function useCredChain() {
 
   // Repay loan (Borrower payment)
   const repayLoan = async (loanId: bigint, amount: bigint) => {
-    const hash = await writeContractAsync({
+    const hash = await runWrite("borrower", {
       address: contracts.loanManager,
       abi: LoanManagerABI,
       functionName: "repayLoan",
@@ -260,7 +300,7 @@ export function useCredChain() {
 
   // Governance submit approval
   const approveGovernance = async (loanId: bigint) => {
-    const hash = await writeContractAsync({
+    const hash = await runWrite("admin", {
       address: contracts.loanGovernance,
       abi: LoanGovernanceABI,
       functionName: "submitApproval",
@@ -272,7 +312,7 @@ export function useCredChain() {
 
   // Governance reject
   const rejectGovernance = async (loanId: bigint) => {
-    const hash = await writeContractAsync({
+    const hash = await runWrite("admin", {
       address: contracts.loanGovernance,
       abi: LoanGovernanceABI,
       functionName: "rejectLoan",
@@ -284,7 +324,7 @@ export function useCredChain() {
 
   // Direct LoanManager approval (for operator/admin)
   const approveLoanDirect = async (loanId: bigint) => {
-    const hash = await writeContractAsync({
+    const hash = await runWrite("admin", {
       address: contracts.loanManager,
       abi: LoanManagerABI,
       functionName: "approveLoan",
@@ -310,8 +350,11 @@ export function useCredChain() {
   };
 
   return {
-    address,
+    address: effectiveAddress,
+    realAddress: address,
     isConnected,
+    isDemoMode,
+    activeRole: activeUserRole,
     chain,
     credBalance: credBalance as bigint | undefined,
     totalLoans: totalLoans as bigint | undefined,
@@ -338,10 +381,14 @@ export function useCredChain() {
     approveGovernance,
     rejectGovernance,
     approveLoanDirect,
+    executeWrite: runWrite,
     refetchBalance,
     refetchBorrowerLoans,
     refetchTotalLoans,
     refetchActiveLoans,
+    refetchReputationScore,
+    refetchReputationRecord,
+    refetchOracle,
     isWritePending,
   };
 }

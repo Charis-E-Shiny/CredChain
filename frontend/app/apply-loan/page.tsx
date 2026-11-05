@@ -27,7 +27,7 @@ interface PastAssessment {
 }
 
 export default function ApplyLoanPage() {
-  const { address, isConnected, credBalance, oraclePrice, requestLoan, approveToken, isWritePending } = useCredChain();
+  const { address, isConnected, isDemoMode, credBalance, oraclePrice, requestLoan, approveToken, isWritePending } = useCredChain();
 
   const [amount, setAmount] = useState("1000");
   const [collateral, setCollateral] = useState("200");
@@ -73,8 +73,8 @@ export default function ApplyLoanPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isConnected || !address) {
-      setError("Please connect your MetaMask wallet to apply for a loan.");
+    if ((!isConnected && !isDemoMode) || !address) {
+      setError("Please connect your wallet or sign in as Demo Borrower to apply for a loan.");
       return;
     }
 
