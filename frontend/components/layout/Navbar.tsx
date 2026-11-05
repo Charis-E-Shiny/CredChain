@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useAccount, useDisconnect } from "wagmi";
+import { useAccount, useDisconnect, useConnect } from "wagmi";
 import { useRole, UserRole } from "@/context/RoleContext";
 import { useCredChain } from "@/hooks/useCredChain";
 import { shortenAddress, formatTokenAmount, cn } from "@/lib/utils";
@@ -48,20 +48,45 @@ const ROLE_LABELS: Record<UserRole, string> = {
 export function Navbar() {
   const { address, isConnected, chain } = useAccount();
   const { disconnect } = useDisconnect();
+  const { connect, connectors } = useConnect();
   const router = useRouter();
   const pathname = usePathname();
+
+  const handleConnectMetaMask = () => {
+    const injected = connectors.find((c) => c.name === "MetaMask" || c.id === "injected");
+    if (injected) {
+      connect({ connector: injected });
+    } else if (connectors[0]) {
+      connect({ connector: connectors[0] });
+    }
+  };
 
   const {
     role, adminError, clearAdminError,
     isDemoMode, demoUser, demoLogout, isLoggedIn,
   } = useRole();
-  const { credBalance } = useCredChain();
+  const { credBalance, requestFaucet } = useCredChain();
 
   const [faucetLoading, setFaucetLoading] = useState(false);
   const [faucetSuccess, setFaucetSuccess] = useState(false);
+  const [credFaucetLoading, setCredFaucetLoading] = useState(false);
+  const [credFaucetSuccess, setCredFaucetSuccess] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+
+  const handleCredFaucet = async () => {
+    setCredFaucetLoading(true);
+    try {
+      await requestFaucet("1000");
+      setCredFaucetSuccess(true);
+      setTimeout(() => setCredFaucetSuccess(false), 3000);
+    } catch (err: any) {
+      alert(err?.shortMessage || err?.message || "Failed to mint CRED tokens in MetaMask.");
+    } finally {
+      setCredFaucetLoading(false);
+    }
+  };
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -218,6 +243,36 @@ export function Navbar() {
 
         {/* Right: Account / Actions */}
         <div className="flex items-center gap-2.5 shrink-0 ml-auto">
+          {/* MetaMask Live Connection Pill / Connect Button */}
+          {isConnected ? (
+            <div
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-xl border font-mono font-semibold"
+              style={{
+                borderColor: "rgba(52,118,90,0.3)",
+                backgroundColor: "rgba(52,118,90,0.08)",
+                color: "#34765A",
+              }}
+              title={`MetaMask Wallet Connected: ${address}`}
+            >
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>🦊 {shortenAddress(address || "")}</span>
+            </div>
+          ) : (
+            <button
+              onClick={handleConnectMetaMask}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border transition-all shadow-sm hover:scale-105"
+              style={{
+                borderColor: "rgba(214,168,95,0.5)",
+                backgroundColor: "rgba(214,168,95,0.15)",
+                color: "#8B6514",
+              }}
+              title="Connect your MetaMask wallet for interactive on-chain signing"
+            >
+              <Wallet className="h-3.5 w-3.5 text-[#D6A85F]" />
+              <span>Connect MetaMask</span>
+            </button>
+          )}
+
           {/* Network badge (when real wallet connected) */}
           {isConnected && (
             <div
@@ -256,6 +311,24 @@ export function Navbar() {
             >
               <Fuel className="h-3 w-3" />
               {faucetSuccess ? "Credited!" : faucetLoading ? "..." : "1,000 ETH"}
+            </button>
+          )}
+
+          {/* CRED Token Faucet Button (MetaMask) */}
+          {isConnected && (
+            <button
+              onClick={handleCredFaucet}
+              disabled={credFaucetLoading}
+              className="hidden md:flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border transition-colors hover:scale-105"
+              style={{
+                borderColor: "rgba(214,168,95,0.4)",
+                backgroundColor: "rgba(214,168,95,0.12)",
+                color: "#8B6514",
+              }}
+              title="Mint 1,000 CRED tokens via MetaMask"
+            >
+              <Coins className="h-3 w-3 text-[#D6A85F]" />
+              {credFaucetSuccess ? "Minted!" : credFaucetLoading ? "Signing..." : "+1,000 CRED"}
             </button>
           )}
 

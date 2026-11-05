@@ -43,9 +43,8 @@ export function getLocalRpcUrl(): string {
 
 /**
  * Executes a smart contract write transaction.
- * Priority 1: If Wagmi connector is already connected, executes through Wagmi -> Prompts MetaMask modal.
- * Priority 2: If MetaMask (window.ethereum) is installed in browser, requests connection and executes via custom provider -> Prompts MetaMask modal.
- * Priority 3: Only if NO Web3 extension is available in browser (e.g., pure headless / demo without extension), executes directly on local node.
+ * In the browser, transactions ALWAYS prompt and execute through the user's MetaMask extension.
+ * If MetaMask is not installed or user rejects, it raises a clear error rather than silently signing.
  */
 export async function executeContractWithFallback({
   params,
@@ -58,110 +57,119 @@ export async function executeContractWithFallback({
   isConnected?: boolean;
   writeContractAsync?: (args: any) => Promise<`0x${string}`>;
 }): Promise<`0x${string}`> {
-  // 1. Try Wagmi writeContractAsync if already connected
-  if (isConnected && writeContractAsync) {
-    try {
-      const hash = await writeContractAsync({
-        address: params.address,
-        abi: params.abi,
-        functionName: params.functionName,
-        args: params.args,
-        value: params.value,
-      });
-      return hash;
-    } catch (err: any) {
-      const msg = String(err?.message || "");
-      const isConnectorError =
-        msg.includes("Connector not connected") ||
-        msg.includes("ConnectorNotConnectedError") ||
-        err?.name === "ConnectorNotConnectedError";
+  // If running in browser window, strictly require MetaMask wallet confirmation
+  if (typeof window !== "undefined") {
+    // 1. If Wagmi connector is already connected and ready, use writeContractAsync
+    if (isConnected && writeContractAsync) {
+      try {
+        const hash = await writeContractAsync({
+          address: params.address,
+          abi: params.abi,
+          functionName: params.functionName,
+          args: params.args,
+          value: params.value,
+        });
+        return hash;
+      } catch (err: any) {
+        const msg = String(err?.message || "");
+        // If user cancelled in MetaMask
+        if (
+          msg.includes("User rejected") ||
+          msg.includes("user rejected") ||
+          err?.code === 4001 ||
+          err?.name === "UserRejectedRequestError"
+        ) {
+          throw new Error("Transaction was cancelled in MetaMask.");
+        }
 
-      // If user actively rejected transaction in MetaMask, stop and rethrow
-      if (msg.includes("User rejected") || msg.includes("user rejected") || err?.code === 4001) {
-        throw new Error("Transaction was rejected in MetaMask.");
-      }
+        const isConnectorError =
+          msg.includes("Connector not connected") ||
+          msg.includes("ConnectorNotConnectedError") ||
+          err?.name === "ConnectorNotConnectedError";
 
-      if (!isConnectorError) {
-        throw err;
+        if (!isConnectorError) {
+          throw err;
+        }
+        console.warn("Wagmi connector not active, falling back to direct window.ethereum MetaMask prompt...");
       }
-      console.warn("Wagmi connector not actively connected; attempting direct browser provider (window.ethereum)...");
     }
-  }
 
-  // 2. If MetaMask is installed in the browser window, ALWAYS prompt MetaMask!
-  if (typeof window !== "undefined" && (window as any).ethereum) {
+    // 2. Direct browser MetaMask provider (window.ethereum)
+    const ethereum = (window as any).ethereum;
+    if (!ethereum) {
+      throw new Error(
+        "MetaMask extension was not detected. Please install the MetaMask extension and connect your Web3 wallet to interact with CredChain."
+      );
+    }
+
     try {
-      const ethereum = (window as any).ethereum;
-
-      // Ensure MetaMask is connected and requesting account
+      // Prompt MetaMask connection if not yet connected
       const accounts = (await ethereum.request({
         method: "eth_requestAccounts",
       })) as string[];
 
-      if (accounts && accounts.length > 0) {
-        const userAccount = accounts[0] as `0x${string}`;
+      if (!accounts || accounts.length === 0) {
+        throw new Error("No account selected in MetaMask. Please unlock and connect MetaMask.");
+      }
 
-        // Ensure user is on local network if on Anvil (Chain ID 31337 = 0x7a69)
-        if (chainConfig.chainId === 31337) {
-          try {
+      const userAccount = accounts[0] as `0x${string}`;
+
+      // Switch to local Anvil network (31337 = 0x7a69) if needed
+      if (chainConfig.chainId === 31337) {
+        try {
+          await ethereum.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: "0x7a69" }],
+          });
+        } catch (switchErr: any) {
+          if (switchErr.code === 4902) {
             await ethereum.request({
-              method: "wallet_switchEthereumChain",
-              params: [{ chainId: "0x7a69" }],
+              method: "wallet_addEthereumChain",
+              params: [
+                {
+                  chainId: "0x7a69",
+                  chainName: "Anvil Local",
+                  rpcUrls: ["http://127.0.0.1:8545"],
+                  nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+                },
+              ],
             });
-          } catch (switchErr: any) {
-            if (switchErr.code === 4902) {
-              await ethereum.request({
-                method: "wallet_addEthereumChain",
-                params: [
-                  {
-                    chainId: "0x7a69",
-                    chainName: "Anvil Local",
-                    rpcUrls: ["http://127.0.0.1:8545"],
-                    nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
-                  },
-                ],
-              });
-            }
           }
         }
-
-        const client = createWalletClient({
-          account: userAccount,
-          chain: (chainConfig.chainId === 1337 || chainConfig.chainId === 5777) ? ganache : anvil,
-          transport: custom(ethereum),
-        });
-
-        // This prompts MetaMask modal!
-        const hash = await client.writeContract({
-          address: params.address,
-          abi: params.abi,
-          functionName: params.functionName,
-          args: params.args as any,
-          value: params.value,
-        });
-
-        return hash;
       }
+
+      const client = createWalletClient({
+        account: userAccount,
+        chain: (chainConfig.chainId === 1337 || chainConfig.chainId === 5777) ? ganache : anvil,
+        transport: custom(ethereum),
+      });
+
+      // Directly prompts MetaMask confirmation modal!
+      const hash = await client.writeContract({
+        address: params.address,
+        abi: params.abi,
+        functionName: params.functionName,
+        args: params.args as any,
+        value: params.value,
+      });
+
+      return hash;
     } catch (err: any) {
       const msg = String(err?.message || "");
-      // If user clicked Reject in MetaMask, respect their choice
       if (
         msg.includes("User rejected") ||
         msg.includes("user rejected") ||
         err?.code === 4001 ||
         err?.name === "UserRejectedRequestError"
       ) {
-        throw new Error("Transaction was rejected in MetaMask.");
+        throw new Error("Transaction was cancelled in MetaMask.");
       }
-      console.warn("MetaMask direct prompt failed:", err);
-      // If it's a real contract error, rethrow
-      if (!msg.includes("not supported") && !msg.includes("failed to fetch")) {
-        throw err;
-      }
+      // Re-throw contract errors or revert messages directly
+      throw err;
     }
   }
 
-  // 3. Fallback only if no Web3 wallet extension is installed
+  // 3. Headless / Server / CLI Fallback only (when window is undefined)
   const rpcUrl = getLocalRpcUrl();
   const accountInfo = ANVIL_ACCOUNTS[role] || ANVIL_ACCOUNTS.admin;
   const account = privateKeyToAccount(accountInfo.privateKey);
