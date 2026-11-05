@@ -91,6 +91,10 @@ class CreditAssessmentResponse(BaseModel):
     verification_notes: Optional[str] = Field(default=None, description="Verification notes or discrepancy report details")
     requires_manual_review: bool = Field(default=False, description="Flag indicating human review requirement")
 
+    # Integrity: commitment to this assessment, anchored on-chain as riskAssessmentHash
+    assessment_hash: Optional[str] = Field(default=None, description="0x bytes32 hash committing to this assessment")
+    verification_record_hash: Optional[str] = Field(default=None, description="Hash of the verification record used")
+
     model_config = {"from_attributes": True}
 
 
@@ -103,6 +107,8 @@ class CreditHistoryItem(BaseModel):
     confidence: float
     model_version: str
     created_at: str
+    verification_status: Optional[str] = None
+    assessment_hash: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

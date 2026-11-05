@@ -8,12 +8,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.database.connection import Base, engine
+from app.database.connection import create_schema
 from app.services.prediction_service import load_model
 from app.services.document_processing import DocumentProcessor
 
 # Ensure tables exist and model is loaded for tests
-Base.metadata.create_all(bind=engine)
+create_schema()
 load_model()
 
 SYNTHETIC_SLIP_PATH = os.path.join(
