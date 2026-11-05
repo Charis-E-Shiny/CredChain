@@ -5,7 +5,7 @@ API endpoints for credit risk assessment.
 import json
 import logging
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -21,6 +21,11 @@ from app.schemas.credit_schema import (
     RiskCategory,
 )
 from app.services.explanation_service import explain_prediction
+from app.services.scoring_service import (
+    apply_verification_standing,
+    compute_assessment_hash,
+    verify_assessment_row,
+)
 from app.services.feature_service import request_to_features
 from app.services.prediction_service import (
     ModelNotLoadedError,
@@ -117,15 +122,13 @@ def assess_credit(
         bv.declared_employment_years = request.employment_length_years
 
     verif_status = bv.status
+    standing = apply_verification_standing(float(raw_risk_score), float(raw_confidence), verif_status)
+    adjustment = standing.adjustment
+    confidence = standing.confidence
+    final_risk_score = standing.final_risk_score
+    risk_category = RiskCategory(standing.risk_category)
 
-    # Apply Verification Standing impact on AI Risk Score and Confidence
-    # SOURCE_VERIFIED: -15% relative risk discount, +0.08 confidence
-    # EVIDENCE_CHECKED: -6% relative risk discount, +0.05 confidence
-    # UNVERIFIED: +8% relative risk penalty, capped confidence (0.75)
-    # MANUAL_REVIEW: +15% relative risk penalty, capped confidence (0.70), manual review flag
     if verif_status == "SOURCE_VERIFIED":
-        adjustment = -0.15 * float(raw_risk_score)
-        confidence = min(0.98, float(raw_confidence) + 0.08)
         factors.insert(
             0,
             FeatureImportance(
@@ -136,8 +139,6 @@ def assess_credit(
         )
         eligibility = "Prime tier pre-approval. Source-verified income confirms lowest available micro-lending interest rates."
     elif verif_status == "EVIDENCE_CHECKED":
-        adjustment = -0.06 * float(raw_risk_score)
-        confidence = min(0.95, float(raw_confidence) + 0.05)
         factors.insert(
             0,
             FeatureImportance(
@@ -148,8 +149,6 @@ def assess_credit(
         )
         eligibility = "Standard prime approval. Uploaded gross payroll evidence verified within tolerance."
     elif verif_status == "MANUAL_REVIEW":
-        adjustment = 0.15 * float(raw_risk_score) + 0.05
-        confidence = min(0.70, float(raw_confidence))
         factors.insert(
             0,
             FeatureImportance(
@@ -160,8 +159,6 @@ def assess_credit(
         )
         eligibility = "High risk loading. Income discrepancy detected on evidence. Requires manual review before disbursement."
     else:  # UNVERIFIED
-        adjustment = 0.08 * float(raw_risk_score) + 0.02
-        confidence = min(0.75, float(raw_confidence))
         factors.insert(
             0,
             FeatureImportance(
@@ -172,29 +169,44 @@ def assess_credit(
         )
         eligibility = "Provisional unverified assessment. Upload salary slip at /verification for rate discount and higher borrowing limits."
 
-    final_risk_score = round(min(0.98, max(0.02, float(raw_risk_score) + adjustment)), 4)
-
-    # Classify final risk category based on adjusted score
-    if final_risk_score < 0.35:
-        risk_category = RiskCategory.LOW
-    elif final_risk_score < 0.65:
-        risk_category = RiskCategory.MEDIUM
-    else:
-        risk_category = RiskCategory.HIGH
-
     model_ver = get_model_version()
     now_utc = datetime.now(timezone.utc)
     now_iso = now_utc.isoformat()
 
-    # Save to database
+    # Bind the assessment to its inputs, scores, verification standing, and the
+    # verification record it was computed from. The hash is what the loan request
+    # commits on-chain, so any later change to the stored fields is detectable.
+    assessed_at = now_iso
+    features_json = json.dumps(raw_dict)
+    assessment_hash = compute_assessment_hash({
+        "wallet_address": request.wallet_address.lower(),
+        "features": json.loads(features_json),
+        "raw_risk_score": float(raw_risk_score),
+        "raw_confidence": float(raw_confidence),
+        "final_risk_score": final_risk_score,
+        "confidence": round(float(confidence), 4),
+        "verification_status": verif_status,
+        "verification_record_hash": bv.record_hash,
+        "model_version": model_ver,
+        "assessed_at": assessed_at,
+    })
+
     assessment = CreditAssessment(
         wallet_address=request.wallet_address.lower(),
         risk_score=float(final_risk_score),
-        risk_category=risk_category.value if hasattr(risk_category, "value") else str(risk_category),
-        confidence=float(confidence),
-        features_json=json.dumps(raw_dict),
+        risk_category=risk_category.value,
+        confidence=round(float(confidence), 4),
+        features_json=features_json,
         model_version=model_ver,
         consent_given=True,
+        raw_risk_score=float(raw_risk_score),
+        raw_confidence=float(raw_confidence),
+        verification_status=verif_status,
+        verification_record_hash=bv.record_hash,
+        verification_adjustment=round(adjustment, 4),
+        assessed_at=assessed_at,
+        assessment_hash=assessment_hash,
+        created_at=now_utc,
     )
     db.add(assessment)
 
@@ -243,6 +255,8 @@ def assess_credit(
         reconciliation_variance=disc_pct,
         verification_notes=bv.verifier_notes,
         requires_manual_review=req_manual,
+        assessment_hash=assessment_hash,
+        verification_record_hash=bv.record_hash,
     )
 
 
@@ -268,6 +282,8 @@ def get_credit_history(
             confidence=a.confidence,
             model_version=a.model_version,
             created_at=a.created_at.isoformat() if a.created_at else "",
+            verification_status=a.verification_status,
+            assessment_hash=a.assessment_hash,
         )
         for a in assessments
     ]
@@ -277,3 +293,27 @@ def get_credit_history(
         assessments=items,
         total=len(items),
     )
+
+
+@router.get("/verify/{assessment_id}")
+def verify_assessment(
+    assessment_id: str,
+    onchain_hash: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """Check a stored assessment for tampering and staleness.
+
+    Recomputes the assessment hash from the stored fields, re-applies the
+    verification standing to confirm the stored score, and compares the
+    borrower's current verification status and record with the snapshot taken
+    at assessment time. Pass ``onchain_hash`` to also compare the hash committed
+    in the loan request.
+    """
+    row = db.query(CreditAssessment).filter(CreditAssessment.id == assessment_id).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Assessment not found.")
+
+    bv = db.query(BorrowerVerification).filter(BorrowerVerification.wallet_address == row.wallet_address).first()
+    current_status = bv.status if bv else "UNVERIFIED"
+    current_record = bv.record_hash if bv else None
+    return verify_assessment_row(row, current_status, current_record, onchain_hash)

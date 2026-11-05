@@ -23,6 +23,7 @@ from app.schemas.verification_schema import (
     VerificationStatusResponse,
 )
 from app.services.document_processing import DocumentProcessor, PayrollExtractionResult
+from app.services.scoring_service import rescore_wallet
 
 logger = logging.getLogger(__name__)
 
@@ -202,6 +203,7 @@ class VerificationService:
                 record_hash=bv.record_hash,
             )
             db.add(hist)
+            rescore_wallet(db, clean_wallet, bv.status, bv.record_hash)
             db.commit()
 
         return True
@@ -389,6 +391,7 @@ class VerificationService:
             record_hash=rec_hash,
         )
         db.add(history)
+        rescore_wallet(db, clean_wallet, bv.status, bv.record_hash)
         db.commit()
 
         return DiscrepancyReport(
@@ -573,6 +576,7 @@ class VerificationService:
             record_hash=rec_hash,
         )
         db.add(history)
+        rescore_wallet(db, clean_wallet, bv.status, bv.record_hash)
         db.commit()
 
         return cls.get_borrower_status(db, clean_wallet)
