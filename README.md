@@ -31,7 +31,6 @@
 - [Testing & Security Validation](#-testing--security-validation)
 - [Quick Start Guide](#-quick-start-guide)
 - [Four-Member Team Division & Ownership](#-four-member-team-division--ownership)
-- [Project Presentation & Viva Guide](#-project-presentation--viva-guide)
 - [License & Disclaimer](#-license--disclaimer)
 
 ---
@@ -255,26 +254,6 @@ To maximize clarity, ownership, and grade evaluation, the project is structured 
 | **Member 2** | **ERC-20 Tokenization, Collateral & Escrow** | `CredToken.sol`, `LoanEscrow.sol`, `CredToken.t.sol`, `LoanEscrow.t.sol` | OpenZeppelin ERC-20 standard, non-custodial vaults, checks-effects-interactions pattern, `ReentrancyGuard`, default seizures. |
 | **Member 3** | **Decentralized Authorization & Governance** | `LoanGovernance.sol`, `ILoanGovernance.sol`, `LoanGovernance.t.sol` | Role-Based Access Control (RBAC), multi-party consensus, dynamic thresholds ($< 5\text{K}$ vs $\ge 5\text{K}$), circuit breakers. |
 | **Member 4** | **Chainlink Oracles, Reputation & AI Pipeline** | `CollateralOracle.sol`, `BorrowerReputation.sol`, `backend/app/ml/`, `backend/app/api/` | Chainlink Aggregator V3, staleness checks, deterministic reputation math, GradientBoosting ML default modeling. |
-
----
-
-## 🎙 Project Presentation & Viva Guide
-
-### 2-Minute Evaluator Script
-
-> *"Good morning/afternoon. We are presenting **CredChain**, an AI-powered decentralized micro-lending protocol on Ethereum.*
-> 
-> *Our project addresses the core limitation of Web3 lending today: existing protocols demand 150% to 200% over-collateralization, excluding the micro-borrowers who need credit.*
-> 
-> *CredChain solves this through a balanced, four-module architecture:*
-> 1. *We evaluate consented financial indicators off-chain using a calibrated Scikit-Learn **GradientBoosting** model. This provides explainable risk scoring without black-box blockchain execution.*
-> 2. *Our smart contracts are cleanly partitioned into four independent modules:*
->    - *Module 1, **LoanManager**, enforces an 8-event, 7-state finite state machine.*
->    - *Module 2, **CredToken and LoanEscrow**, handles ERC-20 tokenization and non-custodial collateral custody under strict checks-effects-interactions and reentrancy protections.*
->    - *Module 3, **LoanGovernance**, enforces multi-signature consensus for high-value loans.*
->    - *Module 4, **CollateralOracle and BorrowerReputation**, incorporates real-time Chainlink ETH/USD price feeds with staleness validation and deterministic on-chain reputation scoring.*
-> 
-> *All 111 smart contract tests in Foundry and 7 backend tests in Pytest pass with a 100% success rate."*
 
 ---
 
