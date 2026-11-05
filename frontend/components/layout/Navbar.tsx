@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useAccount, useConnect, useDisconnect } from "wagmi";
+import { useAccount, useDisconnect } from "wagmi";
 import { useRole, UserRole } from "@/context/RoleContext";
 import { useCredChain } from "@/hooks/useCredChain";
 import { shortenAddress, formatTokenAmount, cn } from "@/lib/utils";
@@ -11,44 +11,36 @@ import {
   Wallet, ShieldCheck, Fuel, AlertCircle, X, Menu,
   ChevronDown, LayoutDashboard, BrainCircuit, FilePlus2,
   Store, Receipt, Award, Vote, Compass, SlidersHorizontal,
-  Layers, TrendingUp, FileCheck2, Users, LogOut, User, Coins,
-  Briefcase, UserCheck, Shield
+  Layers, TrendingUp, FileCheck2, Users, LogOut, Coins,
+  Briefcase, UserCheck
 } from "lucide-react";
 import { chainConfig } from "@/config/contracts";
 
+// Borrower nav — "Reputation" and "Credit Passport" removed from top bar as requested
 const borrowerNav = [
-  { name: "Overview",        href: "/borrower",          icon: LayoutDashboard },
-  { name: "AI Assessment",   href: "/credit-assessment",  icon: BrainCircuit },
-  { name: "Apply for Loan",  href: "/apply-loan",        icon: FilePlus2 },
-  { name: "My Loans",        href: "/borrower/loans",    icon: Layers },
-  { name: "Repayments",      href: "/repayment",         icon: Receipt },
-  { name: "Reputation",      href: "/reputation",        icon: Award },
-  { name: "Credit Passport", href: "/credit-passport",   icon: ShieldCheck },
+  { name: "Overview",       href: "/borrower",          icon: LayoutDashboard },
+  { name: "AI Assessment",  href: "/credit-assessment", icon: BrainCircuit },
+  { name: "Apply for Loan", href: "/apply-loan",        icon: FilePlus2 },
+  { name: "My Loans",       href: "/borrower/loans",    icon: Layers },
+  { name: "Repayments",     href: "/repayment",         icon: Receipt },
 ];
 
 const lenderNav = [
-  { name: "Overview",        href: "/lender",               icon: LayoutDashboard },
-  { name: "Marketplace",     href: "/marketplace",          icon: Store },
-  { name: "My Investments",  href: "/lender/investments",   icon: Coins },
-  { name: "Returns",         href: "/lender/returns",       icon: Receipt },
-  { name: "History",         href: "/explorer",             icon: Compass },
+  { name: "Overview",       href: "/lender",             icon: LayoutDashboard },
+  { name: "Marketplace",    href: "/marketplace",        icon: Store },
+  { name: "My Investments", href: "/lender/investments", icon: Coins },
+  { name: "Returns",        href: "/lender/returns",     icon: Receipt },
+  { name: "History",        href: "/explorer",           icon: Compass },
 ];
 
 const adminNav = [
-  { name: "Overview",    href: "/admin",           icon: LayoutDashboard },
-  { name: "Approvals",   href: "/admin/approvals", icon: FileCheck2 },
-  { name: "Governance",  href: "/governance",      icon: Vote },
-  { name: "Oracle",      href: "/admin/oracle",    icon: TrendingUp },
-  { name: "Roles",       href: "/admin/roles",     icon: Users },
-  { name: "Controls",    href: "/admin/controls",  icon: SlidersHorizontal },
-  { name: "Explorer",    href: "/explorer",        icon: Compass },
-];
-
-const guestNav = [
-  { name: "Marketplace",     href: "/marketplace",         icon: Store },
-  { name: "AI Assessment",   href: "/credit-assessment",   icon: BrainCircuit },
-  { name: "Credit Passport", href: "/credit-passport",     icon: ShieldCheck },
-  { name: "Explorer",        href: "/explorer",            icon: Compass },
+  { name: "Overview",       href: "/admin",           icon: LayoutDashboard },
+  { name: "Approvals",      href: "/admin/approvals", icon: FileCheck2 },
+  { name: "Governance",     href: "/governance",      icon: Vote },
+  { name: "Oracle",         href: "/admin/oracle",    icon: TrendingUp },
+  { name: "Roles",          href: "/admin/roles",     icon: Users },
+  { name: "Controls",       href: "/admin/controls",  icon: SlidersHorizontal },
+  { name: "Explorer",       href: "/explorer",        icon: Compass },
 ];
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -64,7 +56,7 @@ export function Navbar() {
   const pathname = usePathname();
 
   const {
-    role, setRole, adminError, clearAdminError,
+    role, adminError, clearAdminError,
     isDemoMode, demoUser, demoLogout, isLoggedIn,
   } = useRole();
   const { credBalance } = useCredChain();
@@ -114,23 +106,29 @@ export function Navbar() {
     router.push("/login");
   };
 
-  const handleSwitchRole = (targetRole: UserRole) => {
-    setRole(targetRole);
-    setUserMenuOpen(false);
-    if (targetRole === "borrower") router.push("/borrower");
-    else if (targetRole === "lender") router.push("/lender");
-    else if (targetRole === "admin") router.push("/admin");
-  };
-
   const networkName = chain?.name || chainConfig.networkName;
   const chainId = chain?.id || chainConfig.chainId;
 
-  const activeNav = isLoggedIn
-    ? (role === "lender" ? lenderNav : role === "admin" ? adminNav : borrowerNav)
-    : guestNav;
+  // On landing page ("/") and login/signup page ("/login"), NO navigation links are displayed in the top bar
+  const isLandingOrAuthPage = pathname === "/" || pathname === "/login";
+
+  // Determine active navigation links based on role (only shown when logged in and NOT on landing/login page)
+  const activeNav = isLandingOrAuthPage
+    ? []
+    : isLoggedIn
+    ? role === "lender"
+      ? lenderNav
+      : role === "admin"
+      ? adminNav
+      : borrowerNav
+    : [];
 
   const homeHref = isLoggedIn
-    ? (role === "lender" ? "/lender" : role === "admin" ? "/admin" : "/borrower")
+    ? role === "lender"
+      ? "/lender"
+      : role === "admin"
+      ? "/admin"
+      : "/borrower"
     : "/";
 
   // Account display
@@ -148,11 +146,11 @@ export function Navbar() {
 
   return (
     <header
-      className="sticky top-0 z-40 w-full border-b shadow-sm"
+      className="sticky top-0 z-40 w-full border-b shadow-sm transition-all"
       style={{
         borderColor: "#E5E1D7",
         backgroundColor: "rgba(255, 255, 255, 0.98)",
-        backdropFilter: "blur(10px)",
+        backdropFilter: "blur(12px)",
       }}
     >
       {/* Admin warning banner */}
@@ -177,11 +175,11 @@ export function Navbar() {
 
       {/* Main Top Bar */}
       <div className="flex h-16 items-center justify-between px-4 lg:px-8 max-w-screen-2xl mx-auto gap-4">
-        {/* Left: Brand */}
+        {/* Left: Brand Logo */}
         <div className="flex items-center gap-6 shrink-0">
-          <Link href={homeHref} className="flex items-center gap-2.5">
+          <Link href={homeHref} className="flex items-center gap-2.5 group">
             <div
-              className="h-9 w-9 rounded-xl flex items-center justify-center font-black text-sm shadow-sm"
+              className="h-9 w-9 rounded-xl flex items-center justify-center font-black text-sm shadow-sm transition-transform group-hover:scale-105"
               style={{ backgroundColor: "#183B32", color: "#D6A85F" }}
             >
               CC
@@ -192,37 +190,39 @@ export function Navbar() {
           </Link>
         </div>
 
-        {/* Center: TOP BAR NAVIGATION ELEMENTS (Migrated from Sidebar) */}
-        <nav className="hidden md:flex items-center gap-1 overflow-x-auto py-1 scrollbar-none flex-1 justify-center max-w-4xl">
-          {activeNav.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all",
-                  isActive
-                    ? "font-semibold shadow-sm"
-                    : "hover:bg-[#F4F1E8]"
-                )}
-                style={
-                  isActive
-                    ? { backgroundColor: "#183B32", color: "#D6A85F" }
-                    : { color: "#777B73" }
-                }
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span>{item.name}</span>
-              </Link>
-            );
-          })}
-        </nav>
+        {/* Center: Top Bar Navigation Elements (only when logged in & not on landing/login) */}
+        {!isLandingOrAuthPage && activeNav.length > 0 && (
+          <nav className="hidden md:flex items-center gap-1 overflow-x-auto py-1 scrollbar-none flex-1 justify-center max-w-3xl">
+            {activeNav.map((item) => {
+              const isActive = pathname === item.href || (pathname.startsWith(item.href + "/") && item.href !== "/borrower" && item.href !== "/lender" && item.href !== "/admin");
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all",
+                    isActive
+                      ? "font-semibold shadow-sm"
+                      : "hover:bg-[#F4F1E8]"
+                  )}
+                  style={
+                    isActive
+                      ? { backgroundColor: "#183B32", color: "#D6A85F" }
+                      : { color: "#777B73" }
+                  }
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span>{item.name}</span>
+                </Link>
+              );
+            })}
+          </nav>
+        )}
 
         {/* Right: Account / Actions */}
-        <div className="flex items-center gap-2.5 shrink-0">
-          {/* Network badge (when wallet connected) */}
+        <div className="flex items-center gap-2.5 shrink-0 ml-auto">
+          {/* Network badge (when real wallet connected) */}
           {isConnected && (
             <div
               className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg border font-mono"
@@ -233,7 +233,7 @@ export function Navbar() {
             </div>
           )}
 
-          {/* CRED Token Balance (when connected to wallet) */}
+          {/* CRED Token Balance (when real wallet connected) */}
           {isConnected && (
             <div
               className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-mono"
@@ -268,7 +268,7 @@ export function Navbar() {
             <div className="relative" ref={userMenuRef}>
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all shadow-sm"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all shadow-sm hover:border-[#183B32]/30"
                 style={{
                   borderColor: "#E5E1D7",
                   backgroundColor: "#fff",
@@ -291,39 +291,16 @@ export function Navbar() {
                 <ChevronDown className="h-3.5 w-3.5 text-[#777B73]" />
               </button>
 
-              {/* User Dropdown */}
+              {/* User Dropdown — Switch Role has been completely removed */}
               {userMenuOpen && (
                 <div
-                  className="absolute right-0 top-full mt-2 w-64 rounded-2xl border bg-white shadow-xl overflow-hidden z-50 p-1"
+                  className="absolute right-0 top-full mt-2 w-60 rounded-2xl border bg-white shadow-xl overflow-hidden z-50 p-1"
                   style={{ borderColor: "#E5E1D7" }}
                 >
                   <div className="p-3 border-b" style={{ borderColor: "#E5E1D7", backgroundColor: "#F4F1E8" }}>
                     <div className="text-xs font-bold" style={{ color: "#252C29" }}>{accountLabel}</div>
                     <div className="text-[11px] font-mono mt-0.5 text-[#777B73] truncate">
-                      {isDemoMode ? `Demo Mode (${ROLE_LABELS[role]} Access)` : address}
-                    </div>
-                  </div>
-
-                  {/* Role Switcher in dropdown */}
-                  <div className="p-2 border-b" style={{ borderColor: "#E5E1D7" }}>
-                    <div className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 text-[#777B73]">
-                      Switch Role
-                    </div>
-                    <div className="grid grid-cols-3 gap-1 pt-1">
-                      {(["borrower", "lender", "admin"] as UserRole[]).map((r) => (
-                        <button
-                          key={r}
-                          onClick={() => handleSwitchRole(r)}
-                          className={cn(
-                            "py-1.5 px-2 text-xs font-semibold rounded-lg capitalize transition-colors text-center",
-                            role === r
-                              ? "bg-[#183B32] text-[#D6A85F]"
-                              : "text-[#777B73] hover:bg-[#F4F1E8] hover:text-[#252C29]"
-                          )}
-                        >
-                          {r}
-                        </button>
-                      ))}
+                      {isDemoMode ? `Active Profile: ${ROLE_LABELS[role]}` : address}
                     </div>
                   </div>
 
@@ -372,7 +349,7 @@ export function Navbar() {
               </Link>
               <Link
                 href="/login?tab=signup"
-                className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl shadow-sm transition-all"
+                className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl shadow-sm transition-all hover:scale-105"
                 style={{ backgroundColor: "#183B32", color: "#D6A85F" }}
               >
                 <Wallet className="h-3.5 w-3.5" />
@@ -381,18 +358,20 @@ export function Navbar() {
             </div>
           )}
 
-          {/* Mobile hamburger */}
-          <button
-            className="md:hidden p-2 rounded-xl hover:bg-[#F4F1E8] transition-colors"
-            onClick={() => setMobileOpen(!mobileOpen)}
-            style={{ color: "#252C29" }}
-          >
-            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+          {/* Mobile hamburger (only shown when there are links or user is logged in) */}
+          {(isLoggedIn || (!isLandingOrAuthPage && activeNav.length > 0)) && (
+            <button
+              className="md:hidden p-2 rounded-xl hover:bg-[#F4F1E8] transition-colors"
+              onClick={() => setMobileOpen(!mobileOpen)}
+              style={{ color: "#252C29" }}
+            >
+              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Mobile Drawer */}
+      {/* Mobile Drawer (Switch role removed) */}
       {mobileOpen && (
         <div className="md:hidden border-t p-4 space-y-4 bg-white" style={{ borderColor: "#E5E1D7" }}>
           {isLoggedIn && (
@@ -411,70 +390,36 @@ export function Navbar() {
                   </div>
                 </div>
               </div>
-
-              {/* Role pill in mobile */}
-              <div className="flex gap-1">
-                {(["borrower", "lender", "admin"] as UserRole[]).map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => handleSwitchRole(r)}
-                    className={cn(
-                      "px-2 py-1 text-[10px] font-bold rounded-md capitalize",
-                      role === r
-                        ? "bg-[#183B32] text-[#D6A85F]"
-                        : "text-[#777B73] bg-white border border-[#E5E1D7]"
-                    )}
-                  >
-                    {r[0].toUpperCase()}
-                  </button>
-                ))}
-              </div>
             </div>
           )}
 
           {/* Mobile Nav Links */}
-          <div className="space-y-1">
-            {activeNav.map((item) => {
-              const isActive = pathname === item.href;
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMobileOpen(false)}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
-                    isActive
-                      ? "bg-[#183B32] text-[#D6A85F] font-semibold"
-                      : "text-[#777B73] hover:text-[#252C29] hover:bg-[#F4F1E8]"
-                  )}
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <span>{item.name}</span>
-                </Link>
-              );
-            })}
-          </div>
-
-          {!isLoggedIn ? (
-            <div className="pt-2 border-t space-y-2" style={{ borderColor: "#E5E1D7" }}>
-              <Link
-                href="/login"
-                onClick={() => setMobileOpen(false)}
-                className="block w-full text-center py-2.5 text-sm font-semibold rounded-xl border border-[#E5E1D7] text-[#252C29]"
-              >
-                Sign In
-              </Link>
-              <Link
-                href="/login?tab=signup"
-                onClick={() => setMobileOpen(false)}
-                className="block w-full text-center py-2.5 text-sm font-bold rounded-xl shadow-sm"
-                style={{ backgroundColor: "#183B32", color: "#D6A85F" }}
-              >
-                Get Started
-              </Link>
+          {activeNav.length > 0 && (
+            <div className="space-y-1">
+              {activeNav.map((item) => {
+                const isActive = pathname === item.href;
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMobileOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
+                      isActive
+                        ? "bg-[#183B32] text-[#D6A85F] font-semibold"
+                        : "text-[#777B73] hover:text-[#252C29] hover:bg-[#F4F1E8]"
+                    )}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span>{item.name}</span>
+                  </Link>
+                );
+              })}
             </div>
-          ) : (
+          )}
+
+          {isLoggedIn && (
             <div className="pt-2 border-t" style={{ borderColor: "#E5E1D7" }}>
               <button
                 onClick={handleSignOut}
