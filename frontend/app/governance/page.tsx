@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useCredChain } from "@/hooks/useCredChain";
 import { useConnect } from "wagmi";
 import { shortenAddress } from "@/lib/utils";
@@ -64,14 +65,22 @@ export default function GovernancePage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <Vote className="h-6 w-6 text-primary" />
-          Decentralized Authorization & Governance
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Module 3 — Multi-party authorization required before smart contracts disburse funds.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <Vote className="h-6 w-6 text-primary" />
+            Decentralized Authorization & Governance
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Module 3 — Multi-party authorization required before smart contracts disburse funds.
+          </p>
+        </div>
+        <Link
+          href="/admin/approvals"
+          className="px-3.5 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity shrink-0"
+        >
+          View Loan Approval Queue →
+        </Link>
       </div>
 
       {/* Signer Mode Banner */}

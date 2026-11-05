@@ -2,38 +2,60 @@
 
 import { useState } from "react";
 import { useCredChain, LoanItem } from "@/hooks/useCredChain";
+import { useConnect } from "wagmi";
 import { formatTokenAmount, shortenAddress, loanStatusLabels, loanStatusColors } from "@/lib/utils";
-import { Store, Coins, CheckCircle, Clock, RotateCcw, AlertCircle, ShieldCheck, ArrowRight } from "lucide-react";
+import {
+  Store,
+  Coins,
+  CheckCircle,
+  Clock,
+  RotateCcw,
+  AlertCircle,
+  ShieldCheck,
+  ArrowRight,
+  Wallet,
+  Zap,
+} from "lucide-react";
 import Link from "next/link";
 
 export default function MarketplacePage() {
   const {
     address,
+    realAddress,
     isConnected,
+    isDemoMode,
     credBalance,
     marketplaceLoans,
     loadingLoans,
     activateLoan,
     isWritePending,
+    fetchAllLoans,
   } = useCredChain();
+
+  const { connect, connectors } = useConnect();
 
   const [fundingId, setFundingId] = useState<string | null>(null);
   const [txMessage, setTxMessage] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleFund = async (loanId: bigint) => {
-    if (!isConnected) {
-      setErrorMsg("Please connect your Web3 wallet to fund a loan.");
-      return;
+  const handleConnectWallet = () => {
+    const injected = connectors.find((c) => c.name === "MetaMask" || c.id === "injected");
+    if (injected) {
+      connect({ connector: injected });
+    } else if (connectors[0]) {
+      connect({ connector: connectors[0] });
     }
+  };
 
+  const handleFund = async (loanId: bigint) => {
     setFundingId(loanId.toString());
     setTxMessage(null);
     setErrorMsg(null);
 
     try {
       const hash = await activateLoan(loanId);
-      setTxMessage(`Loan #${loanId.toString()} activated successfully! You are now the registered lender. Tx: ${hash}`);
+      setTxMessage(`Loan #${loanId.toString()} funded & activated successfully! You are now the registered lender. Tx: ${hash}`);
+      await fetchAllLoans();
     } catch (err: any) {
       setErrorMsg(err?.shortMessage || err?.message || "Failed to fund loan.");
     } finally {
@@ -64,9 +86,47 @@ export default function MarketplacePage() {
         </div>
       </div>
 
+      {/* Execution / Signer Mode Strip */}
+      <div className="p-3.5 rounded-xl border bg-card/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2.5">
+          {isConnected ? (
+            <>
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-muted-foreground">Lender Mode:</span>
+              <span className="font-semibold text-foreground flex items-center gap-1.5">
+                <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                MetaMask / Web3 Wallet ({shortenAddress(realAddress || address || "")})
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+              <span className="text-muted-foreground">Lender Mode:</span>
+              <span className="font-semibold text-foreground flex items-center gap-1.5">
+                <Zap className="h-4 w-4 text-primary" />
+                Direct Liquidity Provider Signer (0x3C44Cd... Lender)
+              </span>
+              <span className="text-[11px] text-muted-foreground hidden md:inline">
+                — Ready to fund loans on local node
+              </span>
+            </>
+          )}
+        </div>
+
+        {!isConnected && (
+          <button
+            onClick={handleConnectWallet}
+            className="px-3 py-1.5 rounded-lg border text-xs font-semibold hover:bg-muted transition-colors flex items-center gap-1.5 shrink-0"
+          >
+            <Wallet className="h-3.5 w-3.5 text-primary" />
+            Connect Browser Wallet (Optional)
+          </button>
+        )}
+      </div>
+
       {/* Transaction Feedback */}
       {txMessage && (
-        <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-500 text-xs flex items-center gap-2.5">
+        <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 text-xs flex items-center gap-2.5">
           <CheckCircle className="h-4 w-4 shrink-0" />
           <span className="font-mono">{txMessage}</span>
         </div>
@@ -143,17 +203,20 @@ export default function MarketplacePage() {
                     <td className="py-3 px-3 font-mono font-bold text-primary">#{loan.id.toString()}</td>
                     <td className="py-3 px-3 font-mono">{shortenAddress(loan.borrower)}</td>
                     <td className="py-3 px-3 font-semibold text-sm">{formatTokenAmount(loan.principal)} CRED</td>
-                    <td className="py-3 px-3 font-mono text-sky-400 font-medium">
+                    <td className="py-3 px-3 font-mono text-sky-500 font-medium">
                       {formatTokenAmount(loan.collateralAmount)} CRED
                     </td>
-                    <td className="py-3 px-3 text-emerald-400 font-bold text-sm">
+                    <td className="py-3 px-3 text-emerald-600 font-bold text-sm">
                       {(loan.interestRateBps / 100).toFixed(1)}%
                     </td>
                     <td className="py-3 px-3 font-medium">
                       {Math.round(Number(loan.duration) / 86400)} Days
                     </td>
                     <td className="py-3 px-3">
-                      <span className="px-2 py-0.5 rounded text-[11px] font-mono bg-sky-950/40 text-sky-400 border border-sky-800/60 font-semibold" title={loan.riskAssessmentHash}>
+                      <span
+                        className="px-2 py-0.5 rounded text-[11px] font-mono bg-sky-950/40 text-sky-400 border border-sky-800/60 font-semibold"
+                        title={loan.riskAssessmentHash}
+                      >
                         ML Verified
                       </span>
                     </td>

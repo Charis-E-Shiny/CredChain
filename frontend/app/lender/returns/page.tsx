@@ -1,12 +1,20 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCredChain } from "@/hooks/useCredChain";
 import { formatTokenAmount, shortenAddress } from "@/lib/utils";
 import { Receipt, ArrowLeft, TrendingUp, CheckCircle2, Clock } from "lucide-react";
 
 export default function LenderReturnsPage() {
+  const router = useRouter();
   const { lenderInvestments, loadingLoans } = useCredChain();
+
+  useEffect(() => {
+    // Automatically redirect to the unified investment portfolio
+    router.replace("/lender/investments");
+  }, [router]);
 
   const active = lenderInvestments.filter((l) => l.status === 2);
   const repaid = lenderInvestments.filter((l) => l.status === 3);

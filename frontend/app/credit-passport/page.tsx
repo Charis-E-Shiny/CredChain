@@ -328,7 +328,7 @@ export default function CreditPassportPage() {
           </div>
         )}
         <div className="text-xs text-muted-foreground">
-          <Link href="/verification" className="text-primary font-semibold hover:underline">
+          <Link href="/credit-assessment" className="text-primary font-semibold hover:underline">
             View Verification Details →
           </Link>
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { useAccount } from "wagmi";
 import { chainConfig } from "@/config/contracts";
 import {
@@ -69,7 +70,14 @@ const STATUS_CONFIG: Record<
 };
 
 export default function VerificationPage() {
+  const router = useRouter();
   const { address } = useAccount();
+
+  useEffect(() => {
+    // Automatically redirect to the unified AI assessment & verification suite
+    router.replace("/credit-assessment");
+  }, [router]);
+
   const activeAddress =
     address || "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
 

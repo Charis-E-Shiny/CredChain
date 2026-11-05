@@ -63,11 +63,11 @@ export default function AdminDashboardPage() {
               Approval Queue ({pendingCount})
             </Link>
             <Link
-              href="/governance"
+              href="/admin/verification"
               className="px-4 py-2.5 rounded-xl border bg-card hover:bg-muted text-xs font-semibold flex items-center gap-2 transition-colors"
             >
-              <Vote className="h-4 w-4" />
-              Governance Settings
+              <ShieldCheck className="h-4 w-4 text-emerald-500" />
+              Document Review
             </Link>
           </div>
         </div>
@@ -153,16 +153,16 @@ export default function AdminDashboardPage() {
             </Link>
 
             <Link
-              href="/governance"
+              href="/admin/verification"
               className="p-5 rounded-2xl border bg-card/50 hover:bg-muted/40 transition-colors group flex items-start justify-between"
             >
               <div className="space-y-1">
                 <div className="font-bold text-sm group-hover:text-primary transition-colors flex items-center gap-2">
-                  <Vote className="h-4 w-4 text-sky-400" />
-                  Governance Thresholds
+                  <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                  Document Verification Review
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Configure multi-approval thresholds and high-value loan ceilings.
+                  Review borrower salary slips and bank statements to assign SOURCE_VERIFIED status.
                 </p>
               </div>
               <ArrowUpRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />

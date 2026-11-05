@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { chainConfig } from "@/config/contracts";
 
-// Borrower nav — AI Assessment and Verification merged into unified underwriting hub
+// Borrower nav — Unified financial underwriting & lending journey
 const borrowerNav = [
   { name: "Overview",       href: "/borrower",          icon: LayoutDashboard },
   { name: "AI Assessment & Verification", href: "/credit-assessment", icon: BrainCircuit },
@@ -25,23 +25,18 @@ const borrowerNav = [
   { name: "Repayments",     href: "/repayment",         icon: Receipt },
 ];
 
+// Lender nav — Streamlined capital deployment & portfolio monitoring
 const lenderNav = [
   { name: "Overview",       href: "/lender",             icon: LayoutDashboard },
   { name: "Marketplace",    href: "/marketplace",        icon: Store },
   { name: "My Investments", href: "/lender/investments", icon: Coins },
-  { name: "Returns",        href: "/lender/returns",     icon: Receipt },
-  { name: "History",        href: "/explorer",           icon: Compass },
 ];
 
+// Admin nav — Essential risk, loan approval, and verification governance
 const adminNav = [
   { name: "Overview",       href: "/admin",              icon: LayoutDashboard },
-  { name: "Approvals",      href: "/admin/approvals",    icon: FileCheck2 },
-  { name: "Verification",   href: "/admin/verification", icon: ShieldCheck },
-  { name: "Governance",     href: "/governance",         icon: Vote },
-  { name: "Oracle",         href: "/admin/oracle",       icon: TrendingUp },
-  { name: "Roles",          href: "/admin/roles",        icon: Users },
-  { name: "Controls",       href: "/admin/controls",     icon: SlidersHorizontal },
-  { name: "Explorer",       href: "/explorer",           icon: Compass },
+  { name: "Loan Approvals", href: "/admin/approvals",    icon: FileCheck2 },
+  { name: "Document Verification", href: "/admin/verification", icon: ShieldCheck },
 ];
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -305,24 +300,60 @@ export function Navbar() {
                     </div>
                   </div>
 
-                  {/* Menu links */}
+                  {/* Role-specific menu links */}
                   <div className="p-1">
-                    <Link
-                      href="/credit-passport"
-                      onClick={() => setUserMenuOpen(false)}
-                      className="flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-[#F4F1E8] text-[#252C29] transition-colors"
-                    >
-                      <ShieldCheck className="h-4 w-4 text-[#183B32]" />
-                      <span>Credit Passport</span>
-                    </Link>
-                    <Link
-                      href="/reputation"
-                      onClick={() => setUserMenuOpen(false)}
-                      className="flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-[#F4F1E8] text-[#252C29] transition-colors"
-                    >
-                      <Award className="h-4 w-4 text-[#183B32]" />
-                      <span>My Reputation</span>
-                    </Link>
+                    {role === "borrower" && (
+                      <>
+                        <Link
+                          href="/credit-passport"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-[#F4F1E8] text-[#252C29] transition-colors"
+                        >
+                          <ShieldCheck className="h-4 w-4 text-[#183B32]" />
+                          <span>Credit Passport</span>
+                        </Link>
+                        <Link
+                          href="/reputation"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-[#F4F1E8] text-[#252C29] transition-colors"
+                        >
+                          <Award className="h-4 w-4 text-[#183B32]" />
+                          <span>My Reputation</span>
+                        </Link>
+                      </>
+                    )}
+
+                    {role === "lender" && (
+                      <Link
+                        href="/lender/investments"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-[#F4F1E8] text-[#252C29] transition-colors"
+                      >
+                        <Coins className="h-4 w-4 text-[#183B32]" />
+                        <span>My Investments</span>
+                      </Link>
+                    )}
+
+                    {role === "admin" && (
+                      <>
+                        <Link
+                          href="/admin/approvals"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-[#F4F1E8] text-[#252C29] transition-colors"
+                        >
+                          <FileCheck2 className="h-4 w-4 text-[#183B32]" />
+                          <span>Loan Approvals</span>
+                        </Link>
+                        <Link
+                          href="/admin/verification"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl hover:bg-[#F4F1E8] text-[#252C29] transition-colors"
+                        >
+                          <ShieldCheck className="h-4 w-4 text-[#183B32]" />
+                          <span>Document Review</span>
+                        </Link>
+                      </>
+                    )}
                   </div>
 
                   {/* Sign Out */}

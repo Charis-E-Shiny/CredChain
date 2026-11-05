@@ -136,7 +136,7 @@ export default function ReputationPage() {
         )}
 
         <div className="flex items-center gap-3 text-xs">
-          <Link href="/verification" className="text-primary font-semibold hover:underline flex items-center gap-1">
+          <Link href="/credit-assessment" className="text-primary font-semibold hover:underline flex items-center gap-1">
             Manage Verification <ArrowRight className="h-3 w-3" />
           </Link>
           <span className="text-muted-foreground">•</span>

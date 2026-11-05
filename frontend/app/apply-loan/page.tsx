@@ -209,7 +209,7 @@ export default function ApplyLoanPage() {
           ) : (
             <span>Unverified declarations may require higher collateral or lender review.</span>
           )}
-          <Link href="/verification" className="text-primary font-semibold hover:underline shrink-0">
+          <Link href="/credit-assessment" className="text-primary font-semibold hover:underline shrink-0">
             {verificationStatus === "SOURCE_VERIFIED" || verificationStatus === "EVIDENCE_CHECKED" ? "View Evidence →" : "Verify Income →"}
           </Link>
         </div>
