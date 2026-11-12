@@ -62,13 +62,9 @@ export default function ApplyLoanPage() {
     if (!address) return;
     setLoadingAssessment(true);
     fetch(`${chainConfig.apiUrl}/api/credit/history/${address}`)
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data: PastAssessment[]) => {
-        if (data && data.length > 0) {
-          setRecentAssessment(data[0]);
-        } else {
-          setRecentAssessment(null);
-        }
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { assessments?: PastAssessment[] } | null) => {
+        setRecentAssessment(data?.assessments?.[0] ?? null);
       })
       .catch((e) => console.error("Error loading assessment:", e))
       .finally(() => setLoadingAssessment(false));

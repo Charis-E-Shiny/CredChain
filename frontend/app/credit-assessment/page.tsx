@@ -139,10 +139,10 @@ export default function MergedAssessmentVerificationPage() {
 
     // Check if prior assessment exists
     fetch(`${chainConfig.apiUrl}/api/credit/history/${activeAddress}`)
-      .then((res) => (res.ok ? res.json() : []))
+      .then((res) => (res.ok ? res.json() : null))
       .then((history) => {
-        if (history && history.length > 0) {
-          const latest = history[0];
+        const latest = history?.assessments?.[0];
+        if (latest) {
           setAssessment({
             risk_score: latest.risk_score,
             risk_category: latest.risk_category,

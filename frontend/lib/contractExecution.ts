@@ -42,6 +42,40 @@ export function getLocalRpcUrl(): string {
 }
 
 /**
+ * Moves MetaMask onto the local Anvil chain, adding the network if it's missing.
+ * Without this, transactions go to whichever network MetaMask has selected and
+ * never reach the contracts this app reads from.
+ */
+async function ensureWalletOnLocalChain(ethereum: any): Promise<void> {
+  if (chainConfig.chainId !== 31337) return;
+
+  const currentChainId = (await ethereum.request({ method: "eth_chainId" })) as string;
+  if (parseInt(currentChainId, 16) === 31337) return;
+
+  try {
+    await ethereum.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: "0x7a69" }],
+    });
+  } catch (switchErr: any) {
+    if (switchErr?.code !== 4902) {
+      throw new Error("Please switch MetaMask to the Anvil Local network (chain ID 31337) and try again.");
+    }
+    await ethereum.request({
+      method: "wallet_addEthereumChain",
+      params: [
+        {
+          chainId: "0x7a69",
+          chainName: "Anvil Local",
+          rpcUrls: ["http://127.0.0.1:8545"],
+          nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+        },
+      ],
+    });
+  }
+}
+
+/**
  * Executes a smart contract write transaction.
  * In the browser, transactions ALWAYS prompt and execute through the user's MetaMask extension.
  * If MetaMask is not installed or user rejects, it raises a clear error rather than silently signing.
@@ -59,6 +93,10 @@ export async function executeContractWithFallback({
 }): Promise<`0x${string}`> {
   // If running in browser window, strictly require MetaMask wallet confirmation
   if (typeof window !== "undefined") {
+    if ((window as any).ethereum) {
+      await ensureWalletOnLocalChain((window as any).ethereum);
+    }
+
     // 1. If Wagmi connector is already connected and ready, use writeContractAsync
     if (isConnected && writeContractAsync) {
       try {
@@ -113,30 +151,6 @@ export async function executeContractWithFallback({
       }
 
       const userAccount = accounts[0] as `0x${string}`;
-
-      // Switch to local Anvil network (31337 = 0x7a69) if needed
-      if (chainConfig.chainId === 31337) {
-        try {
-          await ethereum.request({
-            method: "wallet_switchEthereumChain",
-            params: [{ chainId: "0x7a69" }],
-          });
-        } catch (switchErr: any) {
-          if (switchErr.code === 4902) {
-            await ethereum.request({
-              method: "wallet_addEthereumChain",
-              params: [
-                {
-                  chainId: "0x7a69",
-                  chainName: "Anvil Local",
-                  rpcUrls: ["http://127.0.0.1:8545"],
-                  nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
-                },
-              ],
-            });
-          }
-        }
-      }
 
       const client = createWalletClient({
         account: userAccount,
